@@ -1,0 +1,49 @@
+// Grammar for LTL
+
+ltl = _{ SOI ~ expression ~ EOI }
+
+// Expressions
+expression = _{ infix_expression }
+infix_expression = { prefix_expression ~ (infix_operator ~ prefix_expression)* }
+prefix_expression = { prefix_operator* ~ primary_expression  }
+primary_expression = { quantified_expression | indexed_identifier | identifier | opening_paren ~ expression ~ closing_paren }
+
+quantified_expression = { quantifier ~ identifier ~ (","? ~ identifier)* ~ ("," | "." | ":") ~ expression }
+indexed_identifier = { identifier ~ ("[" ~identifier~ "]") }
+
+opening_paren       = _{ "(" }
+closing_paren       = _{ ")" }
+
+quantifier = _{ exists | forall }
+exists = @{ "exists" | "∃" }
+forall = @{ "forall" | "∀" }
+
+// operators are based on spot's definition: https://spot.lrde.epita.fr/tl.pdf
+prefix_operator = _{ negation | next | finally | globally }
+negation = @{ "!" | "~" | "-" | "¬" }
+next = @{ "X" | "()" | "○" | "◯" }
+finally = @{ "F" | "<>" | "◇" | "⋄" | "♢" }
+globally = @{ "G" | "[]" | "□" | "⬜" | "◻" }
+
+infix_operator = _{
+    // boolean
+    disjunction | conjunction | implication | exclusion | equivalence |
+    // temporal
+    until | weak_until | release
+    }
+disjunction = @{ "|"{1,2} | "\\/" | "+" | "∨" | "∪" }
+conjunction = @{ "&"{1,2} | "/\\" | "*" | "∧" | "∩" }
+implication = @{ "->" | "=>" | "-->" | "→" | "⟶" | "⇒" | "⟹" }
+exclusion   = @{ "xor" | "^" | "⊕" }
+equivalence = @{ "<->" | "<=>" | "<-->" | "↔" | "⇔" }
+until = @{ "U" }
+weak_until = @{ "W" }
+release = @{ "R" | "V" }
+
+
+identifier = @{ ("_" | alpha_num)+ }
+alpha      = _{ 'a'..'z' | 'A'..'Z' }
+alpha_num  = _{ alpha | '0'..'9' }
+
+newline    = _{ "\n" | "\r\n" }
+WHITESPACE = _{ " " | "\t" | newline }
