@@ -1,4 +1,5 @@
-image: "rust:latest"
+#image: "rust:latest"
+image: "rustlang/rust:nightly"
 
 # Install additional packages, like a C compiler and cmake
 #before_script:
