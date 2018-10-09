@@ -25,7 +25,7 @@ lazy_static! {
     };
 }
 
-fn parse(content: &str) -> Result<HyperLTL, Error<Rule>> {
+pub(crate) fn parse(content: &str) -> Result<HyperLTL, Error<Rule>> {
     let pairs = LTLParser::parse(Rule::ltl, content)?;
     Ok(build_ast(pairs))
 }

@@ -6,9 +6,11 @@ extern crate pest_derive;
 extern crate lazy_static;
 
 mod parse;
+mod print;
+mod serialize;
 
 #[derive(Debug, PartialEq, Eq)]
-enum HyperLTL {
+pub enum HyperLTL {
     /// A quantifier, e.g. `forall pi`
     Quant(QuantKind, Vec<String>, Box<HyperLTL>),
     /// A unary operation, e.g., `G x` and `! a`

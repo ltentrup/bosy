@@ -2,8 +2,11 @@
 name = "hyperltl"
 version = "0.1.0"
 authors = ["Leander Tentrup <tentrup@react.uni-saarland.de>"]
+edition = "2018"
 
 [dependencies]
 pest = "^2.0"         # parser generator
 pest_derive = "^2.0"
 lazy_static = "1.1.0" # lazy_static! macro
+serde = "1.0"
+serde_derive = "1.0"
