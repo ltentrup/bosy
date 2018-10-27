@@ -6,7 +6,7 @@ ltl = _{ SOI ~ expression ~ EOI }
 expression = _{ infix_expression }
 infix_expression = { prefix_expression ~ (infix_operator ~ prefix_expression)* }
 prefix_expression = { prefix_operator* ~ primary_expression  }
-primary_expression = { quantified_expression | indexed_identifier | identifier | opening_paren ~ expression ~ closing_paren }
+primary_expression = { quantified_expression | literal | indexed_identifier | identifier | opening_paren ~ expression ~ closing_paren }
 
 quantified_expression = { quantifier ~ identifier ~ (","? ~ identifier)* ~ ("," | "." | ":") ~ expression }
 indexed_identifier = { identifier ~ ("[" ~identifier~ "]") }
@@ -44,6 +44,10 @@ release = @{ "R" | "V" }
 identifier = @{ ("_" | alpha_num)+ }
 alpha      = _{ 'a'..'z' | 'A'..'Z' }
 alpha_num  = _{ alpha | '0'..'9' }
+
+literal = { literal_true | literal_false }
+literal_true = @{ "true" | "True" | "TRUE" | "1" | "⊤" }
+literal_false = @{ "false" | "False" | "FALSE" | "0" | "⊥" }
 
 newline    = _{ "\n" | "\r\n" }
 WHITESPACE = _{ " " | "\t" | newline }

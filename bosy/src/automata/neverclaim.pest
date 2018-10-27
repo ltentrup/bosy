@@ -1,0 +1,32 @@
+// Grammar for SPIN never claim
+
+neverclaim = _{ SOI ~ "never" ~ "{"  ~ state* ~ "}"  ~ EOI }
+
+state = { identifier ~ ":" ~ ( "if" ~ transition* ~ "fi" ~ ";" | skip ) }
+transition = { "::" ~ expression ~ "->" ~ "goto" ~ identifier } 
+skip = @{ "skip" }
+
+// Expressions
+expression = _{ infix_expression }
+infix_expression = { prefix_expression ~ (infix_operator ~ prefix_expression)* }
+prefix_expression = { prefix_operator* ~ primary_expression  }
+primary_expression = { identifier | opening_paren ~ expression ~ closing_paren }
+
+opening_paren       = _{ "(" }
+closing_paren       = _{ ")" }
+
+// operators are based on spot's definition: https://spot.lrde.epita.fr/tl.pdf
+prefix_operator = _{ negation }
+negation = @{ "!" }
+
+infix_operator = _{ disjunction | conjunction }
+disjunction = @{ "||" }
+conjunction = @{ "&&" }
+
+identifier = @{ ("_" | alpha_num)+ }
+alpha      = _{ 'a'..'z' | 'A'..'Z' }
+alpha_num  = _{ alpha | '0'..'9' }
+
+newline    = _{ "\n" | "\r\n" }
+WHITESPACE = _{ " " | "\t" | newline }
+COMMENT    = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }

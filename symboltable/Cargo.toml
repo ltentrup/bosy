@@ -1,0 +1,7 @@
+[package]
+name = "symboltable"
+version = "0.1.0"
+authors = ["Leander Tentrup <tentrup@react.uni-saarland.de>"]
+edition = "2018"
+
+[dependencies]

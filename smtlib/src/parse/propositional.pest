@@ -1,0 +1,33 @@
+// Grammar for propositional logic
+
+prop = _{ SOI ~ expression ~ EOI }
+
+// Expressions
+expression = _{ infix_expression }
+infix_expression = { prefix_expression ~ (infix_operator ~ prefix_expression)* }
+prefix_expression = { prefix_operator* ~ primary_expression  }
+primary_expression = {  identifier | literal | opening_paren ~ expression ~ closing_paren }
+
+opening_paren       = _{ "(" }
+closing_paren       = _{ ")" }
+
+prefix_operator = _{ negation }
+negation = @{ "!" | "~" | "-" | "¬" }
+
+infix_operator = _{ disjunction | conjunction | implication | exclusion | equivalence }
+disjunction = @{ "|"{1,2} | "\\/" | "+" | "∨" | "∪" }
+conjunction = @{ "&"{1,2} | "/\\" | "*" | "∧" | "∩" }
+implication = @{ "->" | "=>" | "-->" | "→" | "⟶" | "⇒" | "⟹" }
+exclusion   = @{ "xor" | "^" | "⊕" }
+equivalence = @{ "<->" | "<=>" | "<-->" | "↔" | "⇔" }
+
+identifier = @{ ("_" | alpha_num)+ }
+alpha      = _{ 'a'..'z' | 'A'..'Z' }
+alpha_num  = _{ alpha | '0'..'9' }
+
+literal = { lit_true | lit_false }
+lit_true = @{ "true" | "TRUE" | "True" | "tt" | "1" }
+lit_false = @{ "false" | "FALSE" | "False" | "ff" | "0" }
+
+newline    = _{ "\n" | "\r\n" }
+WHITESPACE = _{ " " | "\t" | newline }

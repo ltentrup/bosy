@@ -38,7 +38,23 @@ impl Config {
 
         let spec: Specification = serde_json::from_str(&contents)?;
 
-        println!("Specification {:#?}", spec);
+        //println!("Specification {:#?}", spec);
+
+        match spec.check() {
+            Err(errors) => {
+                eprintln!("Specification contains errors");
+                for error in errors {
+                    eprintln!("{}", error);
+                }
+                process::exit(1);
+            }
+            _ => {}
+        }
+
+        eprintln!("LTL specification is {}", spec.ltl());
+
+        let mut encoding = crate::encoding::BoSyEncoding::new(&spec);
+        encoding.solve(1);
 
         unimplemented!();
     }

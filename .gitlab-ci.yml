@@ -1,13 +1,33 @@
+stages:
+  - build
+  - test
+
 #image: "rust:latest"
 image: "rustlang/rust:nightly"
 
 # Install additional packages, like a C compiler and cmake
-#before_script:
-#- apt-get update -yqq
-#- apt-get install -yqq --no-install-recommends build-essential cmake
+before_script:
+- apt-get update -yqq
+- apt-get install -yqq --no-install-recommends build-essential cmake
+# some cmake stuff requires setting git config
+- git config --global user.email "you@example.com"
+- git config --global user.name "Your Name"
+
+# Use cmake to build external tools
+build:cmake:
+  stage: build
+  script:
+  - make
+  artifacts:
+    name: "${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}"
+    expire_in: 1 week
+    paths:
+      - external/bin/
+      - external/lib/
 
 # Use cargo to test the project
 test:cargo:
+  stage: test
   script:
   - rustc --version && cargo --version      # Print version info for debugging
   - cargo test --all --verbose

@@ -5,11 +5,12 @@ extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
 
+mod operations;
 mod parse;
 mod print;
 mod serialize;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum HyperLTL {
     /// A quantifier, e.g. `forall pi`
     Quant(QuantKind, Vec<String>, Box<HyperLTL>),
@@ -19,6 +20,8 @@ pub enum HyperLTL {
     Binary(BinOp, Box<HyperLTL>, Box<HyperLTL>),
     /// A proposition
     Proposition(String, Option<String>),
+    /// A literal, i.e., `true` or `false`
+    Literal(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

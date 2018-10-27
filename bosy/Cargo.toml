@@ -6,6 +6,9 @@ edition = "2018"
 
 [dependencies]
 hyperltl = { path = "../hyperltl" }
+smtlib = { path = "../smtlib" }
+pest = "^2.0"         # parser generator
+pest_derive = "^2.0"
 clap = "2.32.0"       # parsing command line arguments
 serde = "1.0"
 serde_derive = "1.0"

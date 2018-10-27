@@ -31,11 +31,21 @@ pub(crate) fn parse(content: &str) -> Result<HyperLTL, Error<Rule>> {
 }
 
 fn build_ast(pairs: Pairs<Rule>) -> HyperLTL {
-    println!("{:?}", pairs);
+    //println!("{:?}", pairs);
     PREC_CLIMBER.climb(
         pairs,
         |pair: Pair<Rule>| match pair.as_rule() {
             Rule::identifier => HyperLTL::Proposition(String::from(pair.as_str()), None),
+            Rule::literal => match pair
+                .into_inner()
+                .next()
+                .expect("literal contains a single token")
+                .as_rule()
+            {
+                Rule::literal_true => HyperLTL::Literal(true),
+                Rule::literal_false => HyperLTL::Literal(false),
+                _ => unreachable!(),
+            },
             Rule::primary_expression => build_ast(pair.into_inner()),
             Rule::prefix_expression => {
                 // arbitrary many prefix operators ending with some primary_expression
