@@ -34,12 +34,15 @@ impl<'a> BoSyEncoding<'a> {
 
         let mut constraints = Instance::new();
 
-        // Representation of the transition system
-        let states: Vec<Identifier> = (0..bound)
+        // Representation of the transition
+        let states = constraints.declare_sort("S", 0);
+        let initial = constraints.declare_const("s_0", &states);
+        let tau = constraints.declare_fun("tau", &vec![&states], &states);
+        /*let states: Vec<Identifier> = (0..bound)
             .map(|i| constraints.new_ident(&format!("s_{}", i)))
             .collect();
         let state = constraints.declare_enum("S", &states);
-        let tau = constraints.declare_fun("tau", &vec![state.clone()], state.clone());
+        let tau = constraints.declare_fun("tau", &vec![state.clone()], state.clone());*/
 
         println!("{}", constraints);
 

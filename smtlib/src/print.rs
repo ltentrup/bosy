@@ -1,90 +1,111 @@
 use super::*;
+use std::fmt::{Display, Formatter, Result};
 
-impl std::fmt::Display for Instance {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for Instance {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        for sort in &self.sorts {
+            write!(f, "{}\n", sort)?;
+        }
         for decl in &self.declarations {
-            write!(f, "{}\n", decl.to_string(&self.symboltable))?;
+            write!(f, "{}\n", decl)?;
         }
         for assertion in &self.assertions {
-            write!(f, "(assert {})\n", assertion.to_string(&self.symboltable))?;
+            write!(f, "(assert {})\n", assertion)?;
         }
         Ok(())
     }
 }
 
-impl Declaration {
-    fn to_string(&self, s: &SymbolTable) -> String {
-        match &self.kind {
-            DeclKind::Func(name, params, ret) => {
+impl Display for IdentDecl {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match &self {
+            IdentDecl::Func(name, params, ret) => {
                 if params.is_empty() {
-                    format!(
-                        "(declare-const {} {})",
-                        s.get_string(*name),
-                        ret.to_string(s)
-                    )
+                    write!(f, "(declare-const {} {})", name, ret)
                 } else {
                     let formatted: Vec<String> =
-                        params.into_iter().map(|sort| sort.to_string(s)).collect();
-                    format!(
+                        params.into_iter().map(|sort| format!("{}", sort)).collect();
+                    write!(
+                        f,
                         "(declare-fun {} ({}) {})",
-                        s.get_string(*name),
+                        name,
                         formatted.join(" "),
-                        ret.to_string(s)
+                        ret
                     )
                 }
             }
-            DeclKind::Sort(_, _) => unimplemented!(),
-            DeclKind::Enum(name, values) => {
+        }
+    }
+}
+
+impl IdentDecl {
+    fn name(&self) -> &str {
+        match &self {
+            IdentDecl::Func(name, _, _) => name,
+        }
+    }
+}
+
+impl Display for SortDecl {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match &self {
+            SortDecl::Sort(name, arity) => write!(f, "(declare-sort {} {})", name, arity),
+            /*SortDecl::Enum(name, values) => {
                 let formatted: Vec<String> = values
                     .into_iter()
-                    .map(|ident| format!("({})", ident.to_string(s)))
+                    .map(|ident| format!("({})", ident))
                     .collect();
-                format!(
-                    "(declare-datatype {} ( {} ))",
-                    s.get_string(*name),
-                    formatted.join(" "),
-                )
-            }
-        }
-    }
-}
-
-impl Sort {
-    fn to_string(&self, s: &SymbolTable) -> String {
-        match &self.kind {
-            SortKind::Bool => "Bool".into(),
-            SortKind::Simple(ident) => ident.to_string(s),
+                format!("(declare-datatype {} ( {} ))", name, formatted.join(" "),)
+            }*/
             _ => unimplemented!(),
         }
     }
 }
 
-impl Term {
-    fn to_string(&self, s: &SymbolTable) -> String {
+impl SortDecl {
+    fn name(&self) -> &str {
+        match &self {
+            SortDecl::Sort(name, _) => name,
+        }
+    }
+}
+
+impl Display for Sort {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match &self.kind {
-            TermKind::Ident(ident) => ident.to_string(s),
+            SortKind::Bool => write!(f, "Bool"),
+            SortKind::Custom(decl) => write!(f, "{}", decl.name()),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Display for Term {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match &self.kind {
+            TermKind::Ident(ident) => write!(f, "{}", ident),
             TermKind::Appl(ident, terms) => {
                 let formatted: Vec<String> =
-                    terms.into_iter().map(|sort| sort.to_string(s)).collect();
-                format!("({} {})", ident.to_string(s), formatted.join(" "))
+                    terms.into_iter().map(|sort| format!("{}", sort)).collect();
+                write!(f, "({} {})", ident, formatted.join(" "))
             }
             _ => unimplemented!(),
         }
     }
 }
 
-impl Identifier {
-    fn to_string(&self, s: &SymbolTable) -> String {
+impl Display for Identifier {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match &self.kind {
-            IdentKind::Simple(symbol) => s.get_string(*symbol).into(),
-            IdentKind::BooleanFun(fun) => format!("{}", fun),
+            IdentKind::BooleanFun(fun) => write!(f, "{}", fun),
+            IdentKind::Custom(decl) => write!(f, "{}", decl.name()),
             _ => unimplemented!(),
         }
     }
 }
 
-impl std::fmt::Display for BoolFun {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for BoolFun {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             BoolFun::And => write!(f, "and"),
             _ => unimplemented!(),
