@@ -1,7 +1,7 @@
 use crate::automata::conversion::LTL2Automaton;
 use crate::specification::Specification;
 use hyperltl::{HyperLTL, UnOp};
-use smtlib::Instance;
+use smtlib::{Identifier, Instance, Sort};
 use std::process;
 
 pub(crate) struct BoSyEncoding<'a> {
@@ -31,6 +31,17 @@ impl<'a> BoSyEncoding<'a> {
         };
 
         println!("{:?}", automaton);
+
+        let mut constraints = Instance::new();
+
+        // Representation of the transition system
+        let states: Vec<Identifier> = (0..bound)
+            .map(|i| constraints.new_ident(&format!("s_{}", i)))
+            .collect();
+        let state = constraints.declare_enum("S", &states);
+        let tau = constraints.declare_fun("tau", &vec![state.clone()], state.clone());
+
+        println!("{}", constraints);
 
         unimplemented!();
     }

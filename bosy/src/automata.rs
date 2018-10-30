@@ -1,10 +1,8 @@
 use crate::logic::Logic;
-use std::cmp::Eq;
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
-use std::marker::PhantomData;
+use std::collections::HashMap;
 
 pub(crate) mod conversion;
+mod dot;
 
 #[derive(Debug)]
 pub(crate) struct State<L: Logic> {

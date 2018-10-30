@@ -29,32 +29,45 @@ impl Instance {
         }
     }
 
-    fn declare_enum(name: &str, values: &[&str]) {
-        unimplemented!()
+    pub fn new_ident(&mut self, name: &str) -> Identifier {
+        let symbol = self.symboltable.get_symbol_for(name);
+        Identifier::new_simple(symbol)
     }
 
-    fn declare_const(&mut self, name: &str, sort: Sort) -> Identifier {
+    pub fn declare_enum(&mut self, name: &str, values: &[Identifier]) -> Sort {
+        let symbol = self.symboltable.get_symbol_for(name);
+        self.declarations
+            .push(Declaration::new_enum(symbol, values));
+        Sort {
+            kind: SortKind::Simple(Identifier::new_simple(symbol)),
+        }
+    }
+
+    pub fn declare_const(&mut self, name: &str, sort: Sort) -> Identifier {
         let symbol = self.symboltable.get_symbol_for(name);
         self.declarations
             .push(Declaration::new_function(symbol, Vec::new(), sort));
         Identifier::new_simple(symbol)
     }
 
-    fn declare_fun(name: &str, param: &[Sort], ret: Sort) -> Identifier {
-        unimplemented!();
+    pub fn declare_fun(&mut self, name: &str, param: &[Sort], ret: Sort) -> Identifier {
+        let symbol = self.symboltable.get_symbol_for(name);
+        self.declarations
+            .push(Declaration::new_function(symbol, Vec::from(param), ret));
+        Identifier::new_simple(symbol)
     }
 
-    fn assert(&mut self, expr: Term) {
+    pub fn assert(&mut self, expr: Term) {
         self.assertions.push(expr);
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Term {
     kind: TermKind,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum TermKind {
     Lit(Literal),
     Ident(Identifier),
@@ -91,7 +104,7 @@ impl From<Identifier> for Term {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Literal {
     Numeral(Symbol),
     Decimal(Symbol),
@@ -100,12 +113,12 @@ enum Literal {
     String(Symbol),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct Sort {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Sort {
     kind: SortKind,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum SortKind {
     Bool,
     Int,
@@ -115,24 +128,30 @@ enum SortKind {
 }
 
 impl Sort {
-    const BOOL: Sort = Sort {
+    pub const BOOL: Sort = Sort {
         kind: SortKind::Bool,
     };
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct Identifier {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Identifier {
     kind: IdentKind,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum IdentKind {
     Simple(Symbol),
-    Indexed(Symbol, Vec<usize>),
+    Indexed(Symbol, Vec<Index>),
     BooleanFun(BoolFun),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum Index {
+    Numeral(usize),
+    Symbol(Symbol),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum BoolFun {
     True,
     False,
@@ -186,29 +205,37 @@ impl Identifier {
     };
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum QuantKind {
     Exists,
     Forall,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Declaration {
     kind: DeclKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum DeclKind {
     /// A function declaration
     Func(Symbol, Vec<Sort>, Sort),
     /// A sort declaration
     Sort(Symbol, usize),
+    /// An enum declaration
+    Enum(Symbol, Vec<Identifier>),
 }
 
 impl Declaration {
     fn new_function(name: Symbol, param: Vec<Sort>, ret: Sort) -> Declaration {
         Declaration {
             kind: DeclKind::Func(name, param, ret),
+        }
+    }
+
+    fn new_enum(name: Symbol, values: &[Identifier]) -> Declaration {
+        Declaration {
+            kind: DeclKind::Enum(name, Vec::from(values)),
         }
     }
 }

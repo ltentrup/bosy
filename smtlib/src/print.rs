@@ -34,6 +34,17 @@ impl Declaration {
                 }
             }
             DeclKind::Sort(_, _) => unimplemented!(),
+            DeclKind::Enum(name, values) => {
+                let formatted: Vec<String> = values
+                    .into_iter()
+                    .map(|ident| format!("({})", ident.to_string(s)))
+                    .collect();
+                format!(
+                    "(declare-datatype {} ( {} ))",
+                    s.get_string(*name),
+                    formatted.join(" "),
+                )
+            }
         }
     }
 }
@@ -42,6 +53,7 @@ impl Sort {
     fn to_string(&self, s: &SymbolTable) -> String {
         match &self.kind {
             SortKind::Bool => "Bool".into(),
+            SortKind::Simple(ident) => ident.to_string(s),
             _ => unimplemented!(),
         }
     }
