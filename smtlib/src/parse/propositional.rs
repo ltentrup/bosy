@@ -2,7 +2,7 @@
 //!
 //! For example `a && (b | !c)`
 
-use crate::{Identifier, Instance, Sort, Term};
+use crate::{IdentDecl, IdentKind, Identifier, Instance, Sort, Term};
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
 use pest::prec_climber::{Assoc, Operator, PrecClimber};
@@ -42,12 +42,23 @@ fn build_term(instance: &mut Instance, pairs: Pairs<Rule>) -> Term {
                     Rule::lit_false => Identifier::FALSE,
                     _ => unreachable!(),
                 };
-                Term::new_ident(ident)
+                Term::new_ident(&ident)
             }
             Rule::identifier => {
                 let name = pair.as_str();
-                let ident = instance.declare_const(name, Sort::BOOL);
-                Term::new_ident(ident)
+                let mut ident = None;
+                for decl in &instance.declarations {
+                    if let IdentDecl::Func(n, _, _) = decl.as_ref() {
+                        if n == name {
+                            ident = Some(Identifier {
+                                kind: IdentKind::Custom(decl.clone()),
+                            });
+                        }
+                    }
+                }
+
+                //let ident = instance.declare_const(name, Sort::BOOL);
+                Term::new_ident(&ident.expect("all variables have to be bound before parsing"))
             }
             Rule::primary_expression => build_term(instance, pair.into_inner()),
             Rule::infix_expression => build_term(instance, pair.into_inner()),
@@ -121,8 +132,11 @@ mod tests {
     fn parse_simple() -> Result<(), Box<Error>> {
         let mut instance = Instance::new();
 
-        let a = Term::new_ident(instance.declare_const("a", Sort::BOOL));
-        let b = Term::new_ident(instance.declare_const("b", Sort::BOOL));
+        let a = instance.declare_const("a", Sort::BOOL);
+        let b = instance.declare_const("b", Sort::BOOL);
+
+        let a = Term::new_ident(&a);
+        let b = Term::new_ident(&b);
         let term_lhs = !a | b;
 
         let term_rhs = parse(&mut instance, "!a | b")?;
@@ -133,10 +147,15 @@ mod tests {
     #[test]
     fn parse_precedence() -> Result<(), Box<Error>> {
         let mut instance = Instance::new();
-        let a = Term::new_ident(instance.declare_const("a", Sort::BOOL));
-        let b = Term::new_ident(instance.declare_const("b", Sort::BOOL));
-        let c1 = Term::new_ident(instance.declare_const("c", Sort::BOOL));
-        let c2 = Term::new_ident(instance.declare_const("c", Sort::BOOL));
+
+        let a = instance.declare_const("a", Sort::BOOL);
+        let b = instance.declare_const("b", Sort::BOOL);
+        let c = instance.declare_const("c", Sort::BOOL);
+
+        let a = Term::new_ident(&a);
+        let b = Term::new_ident(&b);
+        let c1 = Term::new_ident(&c);
+        let c2 = Term::new_ident(&c);
 
         let term_lhs = a | b & !c1 | c2;
         let term_rhs = parse(&mut instance, "a | b && !c || c")?;

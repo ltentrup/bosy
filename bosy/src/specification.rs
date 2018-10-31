@@ -4,8 +4,8 @@ use std::collections::HashSet;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Specification {
-    inputs: Vec<String>,
-    outputs: Vec<String>,
+    pub(crate) inputs: Vec<String>,
+    pub(crate) outputs: Vec<String>,
     assumptions: Vec<HyperLTL>,
     guarantees: Vec<HyperLTL>,
     hyper: Option<Vec<HyperLTL>>,

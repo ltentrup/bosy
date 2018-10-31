@@ -7,7 +7,7 @@ extern crate lazy_static;
 
 use std::collections::HashMap;
 use std::convert::From;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 mod operator;
 pub mod parse;
@@ -37,8 +37,32 @@ impl Instance {
         }
     }
 
-    pub fn declare_enum(&mut self, name: &str, values: &[&str]) -> Sort {
-        unimplemented!();
+    pub fn declare_enum(&mut self, name: &str, values: &[String]) -> (Sort, Vec<Identifier>) {
+        let sort = Rc::new(SortDecl::Enum(
+            name.to_string(),
+            values.iter().map(|s| s.to_string()).collect(),
+        ));
+        self.sorts.push(sort.clone());
+        let idents: Vec<Identifier> = values
+            .iter()
+            .map(|val| {
+                let case = Rc::new(IdentDecl::Case(
+                    val.to_string(),
+                    Sort {
+                        kind: SortKind::Custom(sort.clone()),
+                    },
+                ));
+                self.declarations.push(case.clone());
+                Identifier {
+                    kind: IdentKind::Custom(case),
+                }
+            }).collect();
+        (
+            Sort {
+                kind: SortKind::Custom(sort),
+            },
+            idents,
+        )
     }
 
     pub fn declare_const(&mut self, name: &str, sort: &Sort) -> Identifier {
@@ -66,30 +90,52 @@ impl Instance {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Term {
-    kind: TermKind,
+    pub kind: TermKind,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum TermKind {
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum TermKind {
     Lit(Literal),
     Ident(Identifier),
     Appl(Identifier, Vec<Box<Term>>),
     //Let(Vec<(Symbol, Box<Term>)>, Box<Term>),
-    //Quant(QuantKind, Vec<(Symbol, Sort)>, Box<Term>),
+    Quant(QuantKind, Vec<Identifier>, Box<Term>),
 }
 
 impl Term {
-    fn new_ident(ident: Identifier) -> Term {
+    pub fn new_ident(ident: &Identifier) -> Term {
         Term {
-            kind: TermKind::Ident(ident),
+            kind: TermKind::Ident(ident.clone()),
         }
     }
 
-    fn new_appl(ident: Identifier, param: Vec<Box<Term>>) -> Term {
+    pub fn new_appl(ident: Identifier, param: Vec<Box<Term>>) -> Term {
         Term {
             kind: TermKind::Appl(ident, param),
+        }
+    }
+
+    pub fn new_quant<F>(kind: QuantKind, binding: &[(&str, &Sort)], scope: F) -> Term
+    where
+        F: Fn(&[Identifier]) -> Term,
+    {
+        let identifier: Vec<Identifier> = binding
+            .iter()
+            .map(|(name, sort)| {
+                let decl = Rc::new(IdentDecl::Func(
+                    name.to_string(),
+                    Vec::new(),
+                    (*sort).clone(),
+                ));
+                Identifier {
+                    kind: IdentKind::Custom(decl),
+                }
+            }).collect();
+        let inner = scope(&identifier);
+        Term {
+            kind: TermKind::Quant(kind, identifier, Box::new(inner)),
         }
     }
 
@@ -100,16 +146,74 @@ impl Term {
     pub const FALSE: Term = Term {
         kind: TermKind::Ident(Identifier::FALSE),
     };
-}
 
-impl From<Identifier> for Term {
-    fn from(ident: Identifier) -> Self {
-        Term::new_ident(ident)
+    /// Transfers term from one instance to another using the lookup table
+    pub fn transfer(&self, lookup: &HashMap<Identifier, Identifier>) -> Term {
+        match &self.kind {
+            TermKind::Lit(l) => Term {
+                kind: TermKind::Lit(*l),
+            },
+            TermKind::Ident(i) => {
+                if let Some(t) = lookup.get(i) {
+                    Term::new_ident(t)
+                } else {
+                    Term::new_ident(i)
+                }
+            }
+            TermKind::Appl(i, param) => Term::new_appl(
+                lookup.get(i).unwrap_or(i).clone(),
+                param.iter().map(|t| Box::new(t.transfer(lookup))).collect(),
+            ),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn replace(&self, lookup: &HashMap<Term, Term>) -> Term {
+        if let Some(new) = lookup.get(self) {
+            return new.clone();
+        }
+        match &self.kind {
+            TermKind::Lit(l) => Term {
+                kind: TermKind::Lit(*l),
+            },
+            TermKind::Ident(i) => Term::new_ident(i),
+            TermKind::Appl(i, param) => Term::new_appl(
+                i.clone(),
+                param.iter().map(|t| Box::new(t.replace(lookup))).collect(),
+            ),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn convert<F>(&self, replace: &F) -> Term
+    where
+        F: Fn(&Term) -> Option<Term>,
+    {
+        if let Some(new) = replace(&self) {
+            return new;
+        }
+        match &self.kind {
+            TermKind::Lit(l) => Term {
+                kind: TermKind::Lit(*l),
+            },
+            TermKind::Ident(i) => Term::new_ident(i),
+            TermKind::Appl(i, param) => Term::new_appl(
+                i.clone(),
+                param.iter().map(|t| Box::new(t.convert(replace))).collect(),
+            ),
+            _ => unimplemented!(),
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Literal {
+impl From<&Identifier> for Term {
+    fn from(ident: &Identifier) -> Self {
+        Term::new_ident(&ident)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum Literal {
     Numeral(i128),
     //Decimal(f64),
     //Hexadecimal(Symbol),
@@ -117,20 +221,20 @@ enum Literal {
     //String(String),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum SortDecl {
     /// A sort declaration
     Sort(String, usize),
     // An enum declaration
-    //Enum(String, Vec<IdentDecl>),
+    Enum(String, Vec<String>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Sort {
     kind: SortKind,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum SortKind {
     Bool,
     Int,
@@ -142,15 +246,19 @@ impl Sort {
     pub const BOOL: &'static Sort = &Sort {
         kind: SortKind::Bool,
     };
+
+    pub const INT: &'static Sort = &Sort {
+        kind: SortKind::Int,
+    };
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Identifier {
-    kind: IdentKind,
+    pub kind: IdentKind,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-enum IdentKind {
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub enum IdentKind {
     //Simple(Symbol),
     //Indexed(Symbol, Vec<Index>),
     BooleanFun(BoolFun),
@@ -163,8 +271,8 @@ enum IdentKind {
 //     Symbol(Symbol),
 // }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum BoolFun {
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum BoolFun {
     True,
     False,
     Not,
@@ -178,50 +286,98 @@ enum BoolFun {
 }
 
 impl Identifier {
-    const TRUE: Identifier = Identifier {
+    pub const TRUE: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::True),
     };
 
-    const FALSE: Identifier = Identifier {
+    pub const FALSE: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::False),
     };
 
-    const NOT: Identifier = Identifier {
+    pub const NOT: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Not),
     };
 
-    const AND: Identifier = Identifier {
+    pub const AND: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::And),
     };
 
-    const OR: Identifier = Identifier {
+    pub const OR: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Or),
     };
 
-    const IMPL: Identifier = Identifier {
+    pub const IMPL: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Impl),
     };
 
-    const XOR: Identifier = Identifier {
+    pub const XOR: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Xor),
     };
 
-    const EQUIV: Identifier = Identifier {
+    pub const EQUIV: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Equiv),
     };
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum QuantKind {
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum QuantKind {
     Exists,
     Forall,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum IdentDecl {
     /// A function declaration
     Func(String, Vec<Sort>, Sort),
+    /// An enum case
+    Case(String, Sort),
 }
+
+impl IdentDecl {
+    fn sort(&self) -> &Sort {
+        match self {
+            IdentDecl::Func(_, _, s) => &s,
+            IdentDecl::Case(_, s) => &s,
+        }
+    }
+}
+
+/*enum Sort2 {
+    Static(&'static SortDecl),
+    Dynamic(Rc<SortDecl>),
+}
+
+enum Ident2<'a> {
+    Static(&'a StaticFuncDecl<'a>),
+    Dynamic(Rc<DynamicFuncDecl>)
+}
+
+struct DynamicFuncDecl {
+    name: String,
+    param: Vec<Sort>,
+    ret: Sort,
+}
+
+struct StaticFuncDecl<'a> {
+    name: &'a str,
+    param: &'a[&'a Sort],
+    ret: &'a Sort,
+    // attributes
+}
+
+impl<'a> StaticFuncDecl<'a> {
+    const TRUE: &'static StaticFuncDecl<'static> = &StaticFuncDecl {
+        name: "true",
+        param: &[],
+        ret: Sort::BOOL,
+    };
+
+    const AND: &'static StaticFuncDecl<'static> = &StaticFuncDecl {
+        name: "and",
+        param: &[Sort::BOOL, Sort::BOOL],
+        ret: Sort::BOOL,
+    };
+}*/
 
 #[cfg(test)]
 mod tests {
@@ -231,8 +387,8 @@ mod tests {
     #[test]
     fn print_simple_script() {
         let mut instance = Instance::new();
-        let a = instance.declare_const("a", Sort::BOOL);
-        let b = instance.declare_const("b", Sort::BOOL);
+        let a = &instance.declare_const("a", Sort::BOOL);
+        let b = &instance.declare_const("b", Sort::BOOL);
         instance.assert(Term::new_appl(
             Identifier::AND,
             vec![Box::new(a.into()), Box::new(b.into())],

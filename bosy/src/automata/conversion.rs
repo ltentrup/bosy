@@ -28,18 +28,26 @@ impl LTL2Automaton {
             .arg(format!("{}", spec))
             .arg("--spin")
             .output()?;
-        println!("{:?}", output);
+        //println!("{:?}", output);
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout)?;
-        CoBuchiAutomaton::from(&stdout)
+        CoBuchiAutomaton::from(&stdout, spec.get_propositions().into_iter())
     }
 }
 
 impl CoBuchiAutomaton<smtlib::Term> {
-    fn from(neverclaim: &str) -> Result<Self, Box<Error>> {
+    fn from<'a>(
+        neverclaim: &str,
+        propositions: impl Iterator<Item = &'a str>,
+    ) -> Result<Self, Box<Error>> {
         let pairs = NeverClaimParser::parse(Rule::neverclaim, neverclaim)?;
 
-        let mut automaton = CoBuchiAutomaton::<smtlib::Term>::new(smtlib::Instance::new());
+        let mut instance = smtlib::Instance::new();
+        for prop in propositions {
+            instance.declare_const(prop, smtlib::Sort::BOOL);
+        }
+
+        let mut automaton = CoBuchiAutomaton::<smtlib::Term>::new(instance);
 
         let mut translation: HashMap<&str, StateId> = HashMap::new();
 
