@@ -283,6 +283,12 @@ pub enum BoolFun {
     Equiv,
     Distinct,
     Ite,
+    /// Less than `<`
+    Lt,
+    /// Less or equal `<=`
+    Le,
+    // Equal `=`
+    Eq,
 }
 
 impl Identifier {
@@ -316,6 +322,18 @@ impl Identifier {
 
     pub const EQUIV: Identifier = Identifier {
         kind: IdentKind::BooleanFun(BoolFun::Equiv),
+    };
+
+    pub const LT: Identifier = Identifier {
+        kind: IdentKind::BooleanFun(BoolFun::Lt),
+    };
+
+    pub const LE: Identifier = Identifier {
+        kind: IdentKind::BooleanFun(BoolFun::Le),
+    };
+
+    pub const EQ: Identifier = Identifier {
+        kind: IdentKind::BooleanFun(BoolFun::Eq),
     };
 }
 

@@ -145,6 +145,9 @@ impl Display for BoolFun {
             BoolFun::Impl => write!(f, "=>"),
             BoolFun::False => write!(f, "false"),
             BoolFun::True => write!(f, "true"),
+            BoolFun::Lt => write!(f, "<"),
+            BoolFun::Le => write!(f, "<="),
+            BoolFun::Eq => write!(f, "="),
             _ => unimplemented!(),
         }
     }
