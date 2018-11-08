@@ -21,9 +21,10 @@ implication = @{ "->" | "=>" | "-->" | "→" | "⟶" | "⇒" | "⟹" }
 exclusion   = @{ "xor" | "^" | "⊕" }
 equivalence = @{ "<->" | "<=>" | "<-->" | "↔" | "⇔" }
 
-identifier = @{ ("_" | alpha_num)+ }
-alpha      = _{ 'a'..'z' | 'A'..'Z' }
-alpha_num  = _{ alpha | '0'..'9' }
+identifier    = @{ ("_" | alpha_num_sym)+ }
+alpha         = _{ 'a'..'z' | 'A'..'Z' }
+alpha_num     = _{ alpha | '0'..'9' }
+alpha_num_sym = _{ alpha_num | "[" | "]" }
 
 literal = { lit_true | lit_false }
 lit_true = @{ "true" | "TRUE" | "True" | "tt" | "1" }

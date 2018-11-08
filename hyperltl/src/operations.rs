@@ -44,6 +44,47 @@ impl HyperLTL {
         }
     }
 
+    pub fn get_occurrences(&self) -> HashSet<String> {
+        match self {
+            Quant(_, _, inner) => inner.get_occurrences(),
+            Unary(_, inner) => inner.get_occurrences(),
+            Binary(_, left, right) => left
+                .get_occurrences()
+                .union(&right.get_occurrences())
+                .map(|e| e.clone())
+                .collect(),
+            Proposition(_, _) => {
+                let mut singleton = HashSet::new();
+                singleton.insert(format!("{}", self));
+                singleton
+            }
+            Literal(_) => HashSet::new(),
+        }
+    }
+
+    pub fn get_body(&self) -> &HyperLTL {
+        match self {
+            Quant(_, _, inner) => inner.get_body(),
+            _ => self,
+        }
+    }
+
+    pub fn get_quantifier(&self) -> Vec<(QuantKind, Vec<String>)> {
+        let mut res = Vec::new();
+        self.quantifier(&mut res);
+        res
+    }
+
+    fn quantifier(&self, quant: &mut Vec<(QuantKind, Vec<String>)>) {
+        match self {
+            Quant(kind, param, inner) => {
+                quant.push((*kind, param.clone()));
+                inner.quantifier(quant);
+            }
+            _ => (),
+        }
+    }
+
     /// Brings formula to negation normal form (NNF) and collapses consecutive quantifier of the same type
     fn normalize(self) -> Self {
         self.collapse_quantifier().to_nnf(false)

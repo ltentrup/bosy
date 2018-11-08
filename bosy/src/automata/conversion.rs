@@ -20,31 +20,31 @@ impl LTL2Automaton {
         spec: HyperLTL,
     ) -> Result<CoBuchiAutomaton<smtlib::Term>, Box<Error>> {
         assert!(spec.is_quantifier_free());
-        let test = Command::new("pwd").output();
-        println!("{:?}", test);
+        //let test = Command::new("pwd").output();
+        //println!("{:?}", test);
         let output = Command::new("ltl2tgba")
             .env("PATH", "../external/bin:./external/bin")
             .arg("-f")
-            .arg(format!("{}", spec))
+            .arg(format!("{}", spec.to_spot()))
             .arg("--spin")
             .output()?;
         //println!("{:?}", output);
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout)?;
-        CoBuchiAutomaton::from(&stdout, spec.get_propositions().into_iter())
+        CoBuchiAutomaton::from(&stdout, spec.get_occurrences().into_iter())
     }
 }
 
 impl CoBuchiAutomaton<smtlib::Term> {
     fn from<'a>(
         neverclaim: &str,
-        propositions: impl Iterator<Item = &'a str>,
+        propositions: impl Iterator<Item = String>,
     ) -> Result<Self, Box<Error>> {
         let pairs = NeverClaimParser::parse(Rule::neverclaim, neverclaim)?;
 
         let mut instance = smtlib::Instance::new();
         for prop in propositions {
-            instance.declare_const(prop, smtlib::Sort::BOOL);
+            instance.declare_const(&prop, smtlib::Sort::BOOL);
         }
 
         let mut automaton = CoBuchiAutomaton::<smtlib::Term>::new(instance);

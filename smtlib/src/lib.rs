@@ -117,7 +117,7 @@ impl Term {
         }
     }
 
-    pub fn new_quant<F>(kind: QuantKind, binding: &[(&str, &Sort)], scope: F) -> Term
+    pub fn new_quant<F>(kind: QuantKind, binding: &[(String, &Sort)], scope: F) -> Term
     where
         F: Fn(&[Identifier]) -> Term,
     {

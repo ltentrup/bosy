@@ -8,7 +8,7 @@ pub(crate) struct Specification {
     pub(crate) outputs: Vec<String>,
     assumptions: Vec<HyperLTL>,
     guarantees: Vec<HyperLTL>,
-    hyper: Option<Vec<HyperLTL>>,
+    pub(crate) hyper: Option<Vec<HyperLTL>>,
 }
 
 impl Specification {

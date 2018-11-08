@@ -13,7 +13,7 @@ impl std::fmt::Display for super::HyperLTL {
                 Some(index) => write!(f, "{}[{}]", name, index),
                 None => write!(f, "{}", name),
             },
-            Literal(val) => write!(f, "{}", if *val { "1" } else { "0" }),
+            Literal(val) => write!(f, "{}", if *val { "⊤" } else { "⊥" }),
         }
     }
 }

@@ -9,6 +9,7 @@ mod operations;
 mod parse;
 mod print;
 mod serialize;
+mod spot;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum HyperLTL {
