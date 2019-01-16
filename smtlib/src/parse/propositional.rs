@@ -92,7 +92,7 @@ fn build_term(instance: &mut Instance, pairs: Pairs<Rule>) -> Term {
                 Rule::equivalence => Identifier::EQUIV,
                 _ => unreachable!(),
             };
-            Term::new_appl(op, vec![Box::new(lhs), Box::new(rhs)])
+            Term::new_appl(op, vec![lhs, rhs])
         },
     )
 }

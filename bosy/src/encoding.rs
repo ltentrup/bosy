@@ -100,10 +100,7 @@ impl<'a> BoSyEncoding<'a> {
             if state.initial {
                 constraints.assert(Term::new_appl(
                     lambda.clone(),
-                    vec![
-                        Box::new(Term::new_ident(&state_values[0])),
-                        Box::new(Term::new_ident(&ident)),
-                    ],
+                    vec![Term::new_ident(&state_values[0]), Term::new_ident(&ident)],
                 ))
             }
             for (target, term) in automaton.outgoing(state) {
@@ -217,7 +214,7 @@ impl<'a> BoSyEncoding<'a> {
             let s: Vec<Identifier>;
             let s_prime: Vec<Identifier>;
             let mut ins: Vec<Vec<Identifier>>;
-            let mut ins_appl: Vec<Vec<Box<Term>>>; // inputs used in the transition function of tau
+            let ins_appl: Vec<Vec<Term>>; // inputs used in the transition function of tau
             let mut strat_s: Vec<Identifier> = Vec::new();
             let mut strat_s_prime: Vec<Identifier> = Vec::new();
             let mut strat_tau_equal: Term = Term::TRUE;
@@ -260,15 +257,13 @@ impl<'a> BoSyEncoding<'a> {
                 assert_eq!(ins.len(), univ_path_vars.len());
 
                 // used to build `ins_appl`
-                let mut ins_appl_builder: HashMap<String, Vec<Box<Term>>> = HashMap::new();
+                let mut ins_appl_builder: HashMap<String, Vec<Term>> = HashMap::new();
 
                 // universally controlled path variables
                 for (path_var, inputs) in univ_path_vars.iter().zip(&ins) {
                     // build parameter
-                    let path_ins_appl: Vec<Box<Term>> = inputs
-                        .iter()
-                        .map(|i| Box::new(Term::new_ident(i)))
-                        .collect();
+                    let path_ins_appl: Vec<Term> =
+                        inputs.iter().map(|i| Term::new_ident(i)).collect();
                     ins_appl_builder.insert(path_var.to_string(), path_ins_appl);
 
                     // build replacer for transition function
@@ -290,17 +285,16 @@ impl<'a> BoSyEncoding<'a> {
                 {
                     assert_eq!(in_labels.len(), self.specification.inputs.len());
 
-                    let mut path_ins_appl: Vec<Box<Term>> = Vec::new();
+                    let mut path_ins_appl: Vec<Term> = Vec::new();
 
                     for (i, in_label) in self.specification.inputs.iter().zip(in_labels) {
-                        let mut in_label_args: Vec<Box<Term>> =
-                            vec![Box::new(Term::new_ident(curr_strat_s))];
+                        let mut in_label_args: Vec<Term> = vec![Term::new_ident(curr_strat_s)];
                         in_label_args.extend(
                             global_ins
                                 .split_at(*slice_length)
                                 .0
                                 .iter()
-                                .map(|ele| Box::new(Term::new_ident(ele))),
+                                .map(|ele| Term::new_ident(ele)),
                         );
                         in_out_map.insert(
                             format!(
@@ -310,8 +304,7 @@ impl<'a> BoSyEncoding<'a> {
                             Term::new_appl(in_label.clone(), in_label_args.clone()),
                         );
 
-                        path_ins_appl
-                            .push(Box::new(Term::new_appl(in_label.clone(), in_label_args)));
+                        path_ins_appl.push(Term::new_appl(in_label.clone(), in_label_args));
                     }
 
                     ins_appl_builder.insert(path_var.to_string(), path_ins_appl);
@@ -328,7 +321,7 @@ impl<'a> BoSyEncoding<'a> {
                 // define labels of transition system
                 for ((path_var, inputs), s) in path_vars.iter().zip(&ins_appl).zip(&s) {
                     for (o, ident) in self.specification.outputs.iter().zip(labels) {
-                        let mut label_appl: Vec<Box<Term>> = vec![Box::new(Term::new_ident(&s))];
+                        let mut label_appl: Vec<Term> = vec![Term::new_ident(&s)];
                         label_appl.extend(inputs.clone());
                         in_out_map.insert(
                             format!(
@@ -346,22 +339,18 @@ impl<'a> BoSyEncoding<'a> {
                 for ((current_strat_s, current_strat_s_p), (tau, slice_length)) in
                     strat_s.iter().zip(&strat_s_prime).zip(strat_taus)
                 {
-                    let mut tau_args: Vec<Box<Term>> =
-                        vec![Box::new(Term::new_ident(current_strat_s))];
+                    let mut tau_args: Vec<Term> = vec![Term::new_ident(current_strat_s)];
                     tau_args.extend(
                         global_ins
                             .split_at(*slice_length)
                             .0
                             .iter()
-                            .map(|ele| Box::new(Term::new_ident(ele))),
+                            .map(|ele| Term::new_ident(ele)),
                     );
                     let tau_next = Term::new_appl(tau.clone(), tau_args);
                     let tau_next_equal = Term::new_appl(
                         Identifier::EQ,
-                        vec![
-                            Box::new(tau_next),
-                            Box::new(Term::new_ident(current_strat_s_p)),
-                        ],
+                        vec![tau_next, Term::new_ident(current_strat_s_p)],
                     );
                     strat_tau_equal = strat_tau_equal & tau_next_equal;
                 }
@@ -378,15 +367,12 @@ impl<'a> BoSyEncoding<'a> {
                 identifier = other;
 
                 // inputs
-                ins_appl = vec![identifier
-                    .iter()
-                    .map(|i| Box::new(Term::new_ident(i)))
-                    .collect()];
+                ins_appl = vec![identifier.iter().map(|i| Term::new_ident(i)).collect()];
                 ins = vec![identifier];
 
                 for (o, ident) in self.specification.outputs.iter().zip(labels) {
-                    let mut label_appl: Vec<Box<Term>> = vec![Box::new(Term::new_ident(&s[0]))];
-                    label_appl.extend(ins[0].iter().map(|i| Box::new(Term::new_ident(&i))));
+                    let mut label_appl: Vec<Term> = vec![Term::new_ident(&s[0])];
+                    label_appl.extend(ins[0].iter().map(|i| Term::new_ident(&i)));
                     in_out_map.insert(o.to_string(), Term::new_appl(ident.clone(), label_appl));
                 }
                 for (i, ident) in self.specification.inputs.iter().zip(&ins[0]) {
@@ -415,27 +401,24 @@ impl<'a> BoSyEncoding<'a> {
             let mut tau_next_constraint = Term::TRUE;
             for ((current_s, current_s_p), inputs) in s.iter().zip(&s_prime).zip(&ins_appl) {
                 assert_eq!(inputs.len(), self.specification.inputs.len());
-                let mut tau_appl: Vec<Box<Term>> = vec![Box::new(Term::new_ident(current_s))];
+                let mut tau_appl: Vec<Term> = vec![Term::new_ident(current_s)];
                 tau_appl.extend(inputs.iter().map(|i| i.clone()));
                 let tau_next = Term::new_appl(tau.clone(), tau_appl);
-                let tau_next_equal = Term::new_appl(
-                    Identifier::EQ,
-                    vec![Box::new(tau_next), Box::new(Term::new_ident(current_s_p))],
-                );
+                let tau_next_equal =
+                    Term::new_appl(Identifier::EQ, vec![tau_next, Term::new_ident(current_s_p)]);
                 tau_next_constraint = tau_next_constraint & tau_next_equal;
             }
 
-            let mut lambda_appl: Vec<Box<Term>> =
-                s.iter().map(|s| Box::new(Term::new_ident(&s))).collect();
-            lambda_appl.push(Box::new(Term::new_ident(ident)));
-            lambda_appl.extend(strat_s.iter().map(|s| Box::new(Term::new_ident(&s))));
+            let mut lambda_appl: Vec<Term> = s.iter().map(|s| Term::new_ident(&s)).collect();
+            lambda_appl.push(Term::new_ident(ident));
+            lambda_appl.extend(strat_s.iter().map(|s| Term::new_ident(&s)));
             let lambda_current = Term::new_appl(lambda.clone(), lambda_appl);
 
             Term::new_appl(
                 Identifier::IMPL,
                 vec![
-                    Box::new(lambda_current & transformed & tau_next_constraint & strat_tau_equal),
-                    Box::new(self.next_state(
+                    lambda_current & transformed & tau_next_constraint & strat_tau_equal,
+                    self.next_state(
                         lambda,
                         lambda_sharp,
                         &s,
@@ -445,7 +428,7 @@ impl<'a> BoSyEncoding<'a> {
                         ident,
                         &aut_states[target.id],
                         target.rejecting,
-                    )),
+                    ),
                 ],
             )
         });
@@ -464,12 +447,9 @@ impl<'a> BoSyEncoding<'a> {
         target: &Identifier,
         rejecting: bool,
     ) -> Term {
-        let mut lambda_appl: Vec<Box<Term>> = s_prime
-            .iter()
-            .map(|s| Box::new(Term::new_ident(&s)))
-            .collect();
-        lambda_appl.push(Box::new(Term::new_ident(target)));
-        lambda_appl.extend(strat_s_prime.iter().map(|s| Box::new(Term::new_ident(&s))));
+        let mut lambda_appl: Vec<Term> = s_prime.iter().map(|s| Term::new_ident(&s)).collect();
+        lambda_appl.push(Term::new_ident(target));
+        lambda_appl.extend(strat_s_prime.iter().map(|s| Term::new_ident(&s)));
 
         let lambda_next_appl = lambda_appl.clone();
 
@@ -480,16 +460,15 @@ impl<'a> BoSyEncoding<'a> {
             Identifier::LE
         };
 
-        let mut lambda_curr_appl: Vec<Box<Term>> =
-            s.iter().map(|s| Box::new(Term::new_ident(&s))).collect();
-        lambda_curr_appl.push(Box::new(Term::new_ident(source)));
-        lambda_curr_appl.extend(strat_s.iter().map(|s| Box::new(Term::new_ident(&s))));
+        let mut lambda_curr_appl: Vec<Term> = s.iter().map(|s| Term::new_ident(&s)).collect();
+        lambda_curr_appl.push(Term::new_ident(source));
+        lambda_curr_appl.extend(strat_s.iter().map(|s| Term::new_ident(&s)));
 
         let greater = Term::new_appl(
             fun,
             vec![
-                Box::new(Term::new_appl(lambda_sharp.clone(), lambda_curr_appl)),
-                Box::new(Term::new_appl(lambda_sharp.clone(), lambda_next_appl)),
+                Term::new_appl(lambda_sharp.clone(), lambda_curr_appl),
+                Term::new_appl(lambda_sharp.clone(), lambda_next_appl),
             ],
         );
         l & greater
@@ -627,11 +606,10 @@ impl<'a> BoSyEncoding<'a> {
 
             for (state, ident) in automaton.states().iter().zip(&aut_states) {
                 if state.initial {
-                    let mut lambda_init_args: Vec<Box<Term>> =
-                        vec![Box::new(Term::new_ident(&state_values[0])); num_quant];
-                    lambda_init_args.push(Box::new(Term::new_ident(&ident)));
-                    lambda_init_args
-                        .extend(strat_initial.iter().map(|s| Box::new(Term::new_ident(s))));
+                    let mut lambda_init_args: Vec<Term> =
+                        vec![Term::new_ident(&state_values[0]); num_quant];
+                    lambda_init_args.push(Term::new_ident(&ident));
+                    lambda_init_args.extend(strat_initial.iter().map(|s| Term::new_ident(s)));
                     constraints.assert(Term::new_appl(lambda.clone(), lambda_init_args))
                 }
                 for (target, term) in automaton.outgoing(state) {

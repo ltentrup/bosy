@@ -56,7 +56,8 @@ impl Instance {
                 Identifier {
                     kind: IdentKind::Custom(case),
                 }
-            }).collect();
+            })
+            .collect();
         (
             Sort {
                 kind: SortKind::Custom(sort),
@@ -99,7 +100,7 @@ pub struct Term {
 pub enum TermKind {
     Lit(Literal),
     Ident(Identifier),
-    Appl(Identifier, Vec<Box<Term>>),
+    Appl(Identifier, Vec<Term>),
     //Let(Vec<(Symbol, Box<Term>)>, Box<Term>),
     Quant(QuantKind, Vec<Identifier>, Box<Term>),
 }
@@ -111,7 +112,7 @@ impl Term {
         }
     }
 
-    pub fn new_appl(ident: Identifier, param: Vec<Box<Term>>) -> Term {
+    pub fn new_appl(ident: Identifier, param: Vec<Term>) -> Term {
         Term {
             kind: TermKind::Appl(ident, param),
         }
@@ -132,7 +133,8 @@ impl Term {
                 Identifier {
                     kind: IdentKind::Custom(decl),
                 }
-            }).collect();
+            })
+            .collect();
         let inner = scope(&identifier);
         Term {
             kind: TermKind::Quant(kind, identifier, Box::new(inner)),
@@ -162,7 +164,7 @@ impl Term {
             }
             TermKind::Appl(i, param) => Term::new_appl(
                 lookup.get(i).unwrap_or(i).clone(),
-                param.iter().map(|t| Box::new(t.transfer(lookup))).collect(),
+                param.iter().map(|t| t.transfer(lookup)).collect(),
             ),
             _ => unimplemented!(),
         }
@@ -177,10 +179,9 @@ impl Term {
                 kind: TermKind::Lit(*l),
             },
             TermKind::Ident(i) => Term::new_ident(i),
-            TermKind::Appl(i, param) => Term::new_appl(
-                i.clone(),
-                param.iter().map(|t| Box::new(t.replace(lookup))).collect(),
-            ),
+            TermKind::Appl(i, param) => {
+                Term::new_appl(i.clone(), param.iter().map(|t| t.replace(lookup)).collect())
+            }
             _ => unimplemented!(),
         }
     }
@@ -199,7 +200,7 @@ impl Term {
             TermKind::Ident(i) => Term::new_ident(i),
             TermKind::Appl(i, param) => Term::new_appl(
                 i.clone(),
-                param.iter().map(|t| Box::new(t.convert(replace))).collect(),
+                param.iter().map(|t| t.convert(replace)).collect(),
             ),
             _ => unimplemented!(),
         }
