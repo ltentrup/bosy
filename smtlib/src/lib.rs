@@ -410,7 +410,7 @@ mod tests {
         let b = &instance.declare_const("b", Sort::BOOL);
         instance.assert(Term::new_appl(
             Identifier::AND,
-            vec![Box::new(a.into()), Box::new(b.into())],
+            vec![a.into(), b.into()],
         ));
         let script = format!("{}", instance);
         assert_eq!(
