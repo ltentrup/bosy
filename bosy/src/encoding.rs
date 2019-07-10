@@ -19,8 +19,10 @@ impl<'a> BoSyEncoding<'a> {
         }
     }
 
-    pub(crate) fn solve(&mut self, bound: usize) {
+    pub(crate) fn solve(&mut self, bound: usize, bounds: &[usize], file_name: &str) {
         let linear = HyperLTL::Unary(UnOp::Negation, Box::new(self.specification.ltl()));
+
+        println!("build automaton");
 
         let automaton = match LTL2Automaton::Spot.to_ucw(linear) {
             Err(err) => {
@@ -32,6 +34,8 @@ impl<'a> BoSyEncoding<'a> {
         };
 
         //println!("{:?}", automaton);
+
+        println!("create encoding");
 
         let mut constraints = Instance::new();
 
@@ -92,7 +96,7 @@ impl<'a> BoSyEncoding<'a> {
         );
 
         // representation of run graph
-        let lambda = constraints.declare_fun("lambda", &vec![&states, &aut_state], Sort::BOOL);
+        let lambda = constraints.declare_fun("lambda_", &vec![&states, &aut_state], Sort::BOOL);
         let lambda_sharp =
             constraints.declare_fun("lambda_sharp", &vec![&states, &aut_state], Sort::INT);
 
@@ -132,12 +136,21 @@ impl<'a> BoSyEncoding<'a> {
                 &labels,
                 &tau,
                 bound,
+                bounds,
             );
         }
+        use std::io::BufWriter;
+        use std::io::Write;
 
-        println!("{}\n(check-sat)\n", constraints);
+        println!("write encoding to file");
 
-        unimplemented!();
+        let mut file = std::fs::File::create(file_name).expect("file creation failed");
+        let mut buf_writer = BufWriter::new(file);
+        writeln!(buf_writer, "{}\n(check-sat)\n", constraints);
+
+        //println!("{}\n(check-sat)\n", constraints);
+
+        //unimplemented!();
     }
 
     fn build_transitions(
@@ -483,7 +496,13 @@ impl<'a> BoSyEncoding<'a> {
         labels: &[Identifier],
         tau: &Identifier,
         bound: usize,
+        bounds: &[usize],
     ) {
+        assert_eq!(
+            spec.len(),
+            bounds.len(),
+            "The bounds have to match the number of HyperLTL specifications"
+        );
         for (i, hyper) in spec.iter().enumerate() {
             //println!("{}", hyper);
             //println!("{}", hyper.get_body());
@@ -539,7 +558,7 @@ impl<'a> BoSyEncoding<'a> {
                     hyperltl::QuantKind::Exists => {
                         let (strat_sort, strat_states) = constraints.declare_enum(
                             &format!("S_{}_{}", i, j),
-                            &(0..bound)
+                            &(0..bounds[i])
                                 .into_iter()
                                 .map(|k| format!("s_{}_{}_{}", i, j, k))
                                 .collect::<Vec<String>>(),

@@ -92,9 +92,11 @@ impl Display for Term {
         match &self.kind {
             TermKind::Ident(ident) => write!(f, "{}", ident),
             TermKind::Appl(ident, terms) => {
-                let formatted: Vec<String> =
-                    terms.into_iter().map(|sort| format!("{}", sort)).collect();
-                write!(f, "({} {})", ident, formatted.join(" "))
+                write!(f, "({} ", ident)?;
+                for term in terms {
+                    write!(f, "{} ", term)?;
+                }
+                write!(f, ")\n\t")
             }
             TermKind::Quant(kind, binding, inner) => {
                 let formatted: Vec<String> = binding

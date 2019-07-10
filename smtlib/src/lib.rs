@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::convert::From;
 use std::rc::{Rc, Weak};
 
+mod dqbf;
 mod operator;
 pub mod parse;
 mod print;
@@ -408,10 +409,7 @@ mod tests {
         let mut instance = Instance::new();
         let a = &instance.declare_const("a", Sort::BOOL);
         let b = &instance.declare_const("b", Sort::BOOL);
-        instance.assert(Term::new_appl(
-            Identifier::AND,
-            vec![a.into(), b.into()],
-        ));
+        instance.assert(Term::new_appl(Identifier::AND, vec![a.into(), b.into()]));
         let script = format!("{}", instance);
         assert_eq!(
             script,

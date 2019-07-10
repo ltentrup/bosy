@@ -46,6 +46,11 @@ fn build_term(instance: &mut Instance, pairs: Pairs<Rule>) -> Term {
             }
             Rule::identifier => {
                 let name = pair.as_str();
+                if name == "false" {
+                    return Term::FALSE;
+                } else if name == "true" {
+                    return Term::TRUE;
+                }
                 let mut ident = None;
                 for decl in &instance.declarations {
                     if let IdentDecl::Func(n, _, _) = decl.as_ref() {
@@ -58,7 +63,7 @@ fn build_term(instance: &mut Instance, pairs: Pairs<Rule>) -> Term {
                 }
 
                 //let ident = instance.declare_const(name, Sort::BOOL);
-                Term::new_ident(&ident.expect("all variables have to be bound before parsing"))
+                Term::new_ident(&ident.expect(&format!("all variables have to be bound before parsing, was `{}`", name)))
             }
             Rule::primary_expression => build_term(instance, pair.into_inner()),
             Rule::infix_expression => build_term(instance, pair.into_inner()),

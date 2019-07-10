@@ -27,6 +27,7 @@ impl LTL2Automaton {
             .arg("-f")
             .arg(format!("{}", spec.to_spot()))
             .arg("--spin")
+            .arg("--low")
             .output()?;
         //println!("{:?}", output);
         assert!(output.status.success());
