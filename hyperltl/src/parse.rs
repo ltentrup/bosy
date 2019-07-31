@@ -1,4 +1,4 @@
-use super::{BinOp, HyperLTL, QuantKind, UnOp};
+use super::{HyperLTL, Op, QuantKind};
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
 use pest::prec_climber::{Assoc, Operator, PrecClimber};
@@ -35,15 +35,15 @@ fn build_ast(pairs: Pairs<Rule>) -> HyperLTL {
     PREC_CLIMBER.climb(
         pairs,
         |pair: Pair<Rule>| match pair.as_rule() {
-            Rule::identifier => HyperLTL::Proposition(String::from(pair.as_str()), None),
+            Rule::identifier => HyperLTL::Prop(String::from(pair.as_str()), None),
             Rule::literal => match pair
                 .into_inner()
                 .next()
                 .expect("literal contains a single token")
                 .as_rule()
             {
-                Rule::literal_true => HyperLTL::Literal(true),
-                Rule::literal_false => HyperLTL::Literal(false),
+                Rule::literal_true => HyperLTL::Appl(Op::True, vec![]),
+                Rule::literal_false => HyperLTL::Appl(Op::False, vec![]),
                 _ => unreachable!(),
             },
             Rule::primary_expression => build_ast(pair.into_inner()),
@@ -53,14 +53,14 @@ fn build_ast(pairs: Pairs<Rule>) -> HyperLTL {
                 let mut operators = Vec::new();
                 while let Some(pair) = pairs.next() {
                     match pair.as_rule() {
-                        Rule::negation => operators.push(UnOp::Negation),
-                        Rule::next => operators.push(UnOp::Next),
-                        Rule::finally => operators.push(UnOp::Finally),
-                        Rule::globally => operators.push(UnOp::Globally),
+                        Rule::negation => operators.push(Op::Negation),
+                        Rule::next => operators.push(Op::Next),
+                        Rule::finally => operators.push(Op::Finally),
+                        Rule::globally => operators.push(Op::Globally),
                         Rule::primary_expression => {
                             let mut inner_expr = build_ast(pair.into_inner());
                             for op in operators.into_iter().rev() {
-                                inner_expr = HyperLTL::Unary(op, Box::new(inner_expr));
+                                inner_expr = HyperLTL::Appl(op, vec![inner_expr]);
                             }
                             return inner_expr;
                         }
@@ -91,20 +91,20 @@ fn build_ast(pairs: Pairs<Rule>) -> HyperLTL {
                 let mut pairs = pair.into_inner();
                 let name = pairs.next().expect("mismatch in grammar and AST").as_str();
                 let index = pairs.next().expect("mismatch in grammar and AST").as_str();
-                HyperLTL::Proposition(name.into(), Some(index.into()))
+                HyperLTL::Prop(name.into(), Some(index.into()))
             }
             Rule::infix_expression => build_ast(pair.into_inner()),
             _ => unreachable!(),
         },
         |lhs: HyperLTL, op: Pair<Rule>, rhs: HyperLTL| match op.as_rule() {
-            Rule::disjunction => HyperLTL::Binary(BinOp::Disjunction, Box::new(lhs), Box::new(rhs)),
-            Rule::conjunction => HyperLTL::Binary(BinOp::Conjunction, Box::new(lhs), Box::new(rhs)),
-            Rule::implication => HyperLTL::Binary(BinOp::Implication, Box::new(lhs), Box::new(rhs)),
-            Rule::exclusion => HyperLTL::Binary(BinOp::Exclusion, Box::new(lhs), Box::new(rhs)),
-            Rule::equivalence => HyperLTL::Binary(BinOp::Equivalence, Box::new(lhs), Box::new(rhs)),
-            Rule::until => HyperLTL::Binary(BinOp::Until, Box::new(lhs), Box::new(rhs)),
-            Rule::weak_until => HyperLTL::Binary(BinOp::WeakUntil, Box::new(lhs), Box::new(rhs)),
-            Rule::release => HyperLTL::Binary(BinOp::Release, Box::new(lhs), Box::new(rhs)),
+            Rule::disjunction => HyperLTL::Appl(Op::Disjunction, vec![lhs, rhs]),
+            Rule::conjunction => HyperLTL::Appl(Op::Conjunction, vec![lhs, rhs]),
+            Rule::implication => HyperLTL::Appl(Op::Implication, vec![lhs, rhs]),
+            Rule::exclusion => HyperLTL::Appl(Op::Exclusion, vec![lhs, rhs]),
+            Rule::equivalence => HyperLTL::Appl(Op::Equivalence, vec![lhs, rhs]),
+            Rule::until => HyperLTL::Appl(Op::Until, vec![lhs, rhs]),
+            Rule::weak_until => HyperLTL::Appl(Op::WeakUntil, vec![lhs, rhs]),
+            Rule::release => HyperLTL::Appl(Op::Release, vec![lhs, rhs]),
             _ => unreachable!(),
         },
     )
@@ -145,13 +145,12 @@ mod tests {
         let ast = parse("!a | b").unwrap_or_else(|e| panic!("{}", e));
         assert_eq!(
             ast,
-            HyperLTL::Binary(
-                BinOp::Disjunction,
-                Box::new(HyperLTL::Unary(
-                    UnOp::Negation,
-                    Box::new(HyperLTL::Proposition("a".into(), None))
-                )),
-                Box::new(HyperLTL::Proposition("b".into(), None))
+            HyperLTL::Appl(
+                Op::Disjunction,
+                vec![
+                    HyperLTL::Appl(Op::Negation, vec![HyperLTL::Prop("a".into(), None)]),
+                    HyperLTL::Prop("b".into(), None)
+                ]
             )
         );
     }
@@ -181,12 +180,12 @@ mod tests {
         let ast = parse("!Ga").unwrap_or_else(|e| panic!("{}", e));
         assert_eq!(
             ast,
-            HyperLTL::Unary(
-                UnOp::Negation,
-                Box::new(HyperLTL::Unary(
-                    UnOp::Globally,
-                    Box::new(HyperLTL::Proposition("a".into(), None))
-                ))
+            HyperLTL::Appl(
+                Op::Negation,
+                vec![HyperLTL::Appl(
+                    Op::Globally,
+                    vec![HyperLTL::Prop("a".into(), None)]
+                )]
             )
         );
     }
@@ -226,14 +225,16 @@ mod tests {
         let ast = parse("a | b && c").unwrap_or_else(|e| panic!("{}", e));
         assert_eq!(
             ast,
-            HyperLTL::Binary(
-                BinOp::Disjunction,
-                Box::new(HyperLTL::Proposition("a".into(), None)),
-                Box::new(HyperLTL::Binary(
-                    BinOp::Conjunction,
-                    Box::new(HyperLTL::Proposition("b".into(), None)),
-                    Box::new(HyperLTL::Proposition("c".into(), None))
-                ))
+            HyperLTL::Appl(
+                Op::Disjunction,
+                vec![
+                    HyperLTL::Prop("a".into(), None),
+                    HyperLTL::Appl(
+                        Op::Conjunction,
+                        vec![HyperLTL::Prop("b".into(), None),
+                        HyperLTL::Prop("c".into(), None)]
+                    )
+                ]
             )
         );
     }
@@ -277,7 +278,7 @@ mod tests {
             HyperLTL::Quant(
                 QuantKind::Forall,
                 vec!["pi".into()],
-                Box::new(HyperLTL::Proposition("a".into(), Some("pi".into()))),
+                Box::new(HyperLTL::Prop("a".into(), Some("pi".into()))),
             )
         );
     }

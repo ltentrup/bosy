@@ -15,14 +15,10 @@ mod spot;
 pub enum HyperLTL {
     /// A quantifier, e.g. `forall pi`
     Quant(QuantKind, Vec<String>, Box<HyperLTL>),
-    /// A unary operation, e.g., `G x` and `! a`
-    Unary(UnOp, Box<HyperLTL>),
-    /// A binary operation, e.g., `a U b` and `c && d`
-    Binary(BinOp, Box<HyperLTL>, Box<HyperLTL>),
+    /// An operation, e.g., `G x`, `! a`, `a U b`, or `c && d`
+    Appl(Op, Vec<HyperLTL>),
     /// A proposition
-    Proposition(String, Option<String>),
-    /// A literal, i.e., `true` or `false`
-    Literal(bool),
+    Prop(String, Option<String>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +30,7 @@ pub enum QuantKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnOp {
+pub enum Op {
     /// The Boolean operator `!` for logical inversion
     Negation,
     /// The temporal operator `X` for next
@@ -43,10 +39,6 @@ pub enum UnOp {
     Globally,
     /// The temporal operator `F` for finally
     Finally,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinOp {
     /// The Boolean operator `&&` for logical conjunction
     Conjunction,
     /// The Boolean operator `||` for logical disjunction
@@ -63,4 +55,8 @@ pub enum BinOp {
     WeakUntil,
     /// The temporal operator `R` for release
     Release,
+    /// Literal `true`
+    True,
+    /// Literal `false`
+    False
 }

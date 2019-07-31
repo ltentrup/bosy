@@ -1,7 +1,6 @@
-use super::BinOp::*;
 use super::HyperLTL::*;
+use super::Op::*;
 use super::QuantKind::*;
-use super::UnOp::*;
 use super::*;
 use std::collections::HashSet;
 
@@ -10,10 +9,8 @@ impl HyperLTL {
     pub fn is_quantifier_free(&self) -> bool {
         match self {
             Quant(_, _, _) => false,
-            Unary(_, inner) => inner.is_quantifier_free(),
-            Binary(_, left, right) => left.is_quantifier_free() && right.is_quantifier_free(),
-            Proposition(_, _) => true,
-            Literal(_) => true,
+            Appl(_, inner) => inner.iter().all(|ele| ele.is_quantifier_free()),
+            Prop(_, _) => true,
         }
     }
 
@@ -25,40 +22,34 @@ impl HyperLTL {
         }
     }
 
-    /// Returns the set of propositions contained in the formula
+    /// Returns the set of Props contained in the formula
     pub fn get_propositions(&self) -> HashSet<&str> {
         match self {
             Quant(_, _, inner) => inner.get_propositions(),
-            Unary(_, inner) => inner.get_propositions(),
-            Binary(_, left, right) => left
-                .get_propositions()
-                .union(&right.get_propositions())
-                .map(|e| *e)
-                .collect(),
-            Proposition(prop, _) => {
+            Appl(_, inner) => inner.iter().fold(HashSet::new(), |set, ele| {
+                set.union(&ele.get_propositions()).map(|e| *e).collect()
+            }),
+            Prop(prop, _) => {
                 let mut singleton = HashSet::new();
                 singleton.insert(prop.as_ref());
                 singleton
             }
-            Literal(_) => HashSet::new(),
         }
     }
 
     pub fn get_occurrences(&self) -> HashSet<String> {
         match self {
             Quant(_, _, inner) => inner.get_occurrences(),
-            Unary(_, inner) => inner.get_occurrences(),
-            Binary(_, left, right) => left
-                .get_occurrences()
-                .union(&right.get_occurrences())
-                .map(|e| e.clone())
-                .collect(),
-            Proposition(_, _) => {
+            Appl(_, inner) => inner.iter().fold(HashSet::new(), |set, ele| {
+                set.union(&ele.get_occurrences())
+                    .map(|e| e.clone())
+                    .collect()
+            }),
+            Prop(_, _) => {
                 let mut singleton = HashSet::new();
                 singleton.insert(format!("{}", self));
                 singleton
             }
-            Literal(_) => HashSet::new(),
         }
     }
 
@@ -102,7 +93,7 @@ impl HyperLTL {
                 }
                 Quant(qtype, params, scope.to_nnf(negated).into())
             }
-            Unary(Negation, expr) => unimplemented!(),
+            Appl(Negation, expr) => unimplemented!(),
             _ => unimplemented!(),
         }
     }
@@ -117,26 +108,20 @@ impl QuantKind {
     }
 }
 
-impl BinOp {
+impl Op {
     fn negate(&mut self) {
         *self = match self {
+            Next => Next,
+            Finally => Globally,
+            Globally => Finally,
             Conjunction => Disjunction,
             Disjunction => Conjunction,
             Exclusion => Equivalence,
             Equivalence => Exclusion,
             Until => Release,
             Release => Until,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl UnOp {
-    fn negate(&mut self) {
-        *self = match self {
-            Next => Next,
-            Finally => Globally,
-            Globally => Finally,
+            True => False,
+            False => True,
             _ => unreachable!(),
         }
     }
@@ -149,10 +134,12 @@ mod tests {
 
     #[test]
     fn example_binary() {
-        let expr = Binary(
+        let expr = Appl(
             Disjunction,
-            Box::new(Unary(Negation, Box::new(Proposition("a".into(), None)))),
-            Box::new(Proposition("b".into(), None)),
+            vec![
+                Appl(Negation, vec![Prop("a".into(), None)]),
+                Prop("b".into(), None),
+            ],
         );
         assert!(expr.is_quantifier_free());
         assert!(!expr.is_hyperltl());
@@ -160,10 +147,7 @@ mod tests {
 
     #[test]
     fn example_unary() {
-        let expr = Unary(
-            Negation,
-            Box::new(Unary(Globally, Box::new(Proposition("a".into(), None)))),
-        );
+        let expr = Appl(Negation, vec![Appl(Globally, vec![Prop("a".into(), None)])]);
         assert!(expr.is_quantifier_free());
         assert!(!expr.is_hyperltl());
     }
@@ -173,26 +157,27 @@ mod tests {
         let expr = Quant(
             Forall,
             vec!["pi".into()],
-            Box::new(Proposition("a".into(), Some("pi".into()))),
+            Box::new(Prop("a".into(), Some("pi".into()))),
         );
         assert!(!expr.is_quantifier_free());
         assert!(expr.is_hyperltl());
     }
 
     #[test]
-    fn example_get_propositions() {
-        let expr = Binary(
+    fn example_get_propositionns() {
+        let expr = Appl(
             Conjunction,
-            Box::new(Unary(Negation, Box::new(Proposition("a".into(), None)))),
-            Box::new(Binary(
-                Disjunction,
-                Box::new(Proposition("b".into(), None)),
-                Box::new(Proposition("c".into(), None)),
-            )),
+            vec![
+                Appl(Negation, vec![Prop("a".into(), None)]),
+                Appl(
+                    Disjunction,
+                    vec![Prop("b".into(), None), Prop("c".into(), None)],
+                ),
+            ],
         );
-        let propositions = expr.get_propositions();
-        assert!(propositions.contains("a"));
-        assert!(propositions.contains("b"));
-        assert!(propositions.contains("c"));
+        let Props = expr.get_propositions();
+        assert!(Props.contains("a"));
+        assert!(Props.contains("b"));
+        assert!(Props.contains("c"));
     }
 }

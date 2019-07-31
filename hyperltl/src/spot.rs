@@ -1,18 +1,31 @@
-use super::HyperLTL;
+use super::{HyperLTL, Op};
 use super::HyperLTL::*;
 use std::io::{Error, Write};
 
 impl HyperLTL {
     pub fn to_spot(&self) -> String {
         match self {
-            Unary(op, expr) => format!("{}{}", op, expr.to_spot()),
-            Binary(op, left, right) => format!("({} {} {})", left.to_spot(), op, right.to_spot()),
-            Proposition(name, index) => match index {
+            Appl(op, inner) => {
+                match op {
+                    Op::True => return format!("1"),
+                    Op::False => return format!("0"),
+                    _ => {},
+                }
+                match inner.len() {
+                    0 => format!( "{}", op),
+                    1 => format!( "{}{}", op, inner.iter().next().unwrap()),
+                    _ => {
+                        let operands: Vec<String> = inner.iter().map(|ele| ele.to_spot()).collect();
+                        format!("({})", operands.join(&format!("{}", op)))
+                    },
+                }
+            },
+            Prop(name, index) => match index {
                 Some(index) => format!("\"{}[{}]\"", name, index),
                 None => format!("\"{}\"", name),
             },
-            Literal(val) => format!("{}", if *val { "1" } else { "0" }),
             _ => unreachable!(),
+
         }
     }
 }

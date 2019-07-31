@@ -39,12 +39,12 @@ impl LTL2Automaton {
 impl CoBuchiAutomaton<smtlib::Term> {
     fn from<'a>(
         neverclaim: &str,
-        propositions: impl Iterator<Item = String>,
+        Props: impl Iterator<Item = String>,
     ) -> Result<Self, Box<Error>> {
         let pairs = NeverClaimParser::parse(Rule::neverclaim, neverclaim)?;
 
         let mut instance = smtlib::Instance::new();
-        for prop in propositions {
+        for prop in Props {
             instance.declare_const(&prop, smtlib::Sort::BOOL);
         }
 
@@ -129,13 +129,13 @@ accept_S2:
 
     #[test]
     fn convert_spot() -> Result<(), Box<Error>> {
-        use hyperltl::UnOp::{Finally, Globally};
-        let ltl = HyperLTL::Unary(
+        use hyperltl::Op::{Finally, Globally};
+        let ltl = HyperLTL::Appl(
             Globally,
-            Box::new(HyperLTL::Unary(
+            vec![HyperLTL::Appl(
                 Finally,
-                Box::new(HyperLTL::Proposition("a".into(), None)),
-            )),
+                vec![HyperLTL::Prop("a".into(), None)],
+            )],
         );
         let converter = LTL2Automaton::Spot;
         let automaton = converter.to_ucw(ltl)?;

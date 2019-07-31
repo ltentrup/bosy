@@ -1,7 +1,7 @@
 use crate::automata::conversion::LTL2Automaton;
 use crate::automata::{CoBuchiAutomaton, State};
 use crate::specification::Specification;
-use hyperltl::{HyperLTL, UnOp};
+use hyperltl::{HyperLTL, Op};
 use smtlib::{IdentKind, Identifier, Instance, QuantKind, Sort, Term, TermKind};
 use std::collections::HashMap;
 use std::process;
@@ -20,7 +20,7 @@ impl<'a> BoSyEncoding<'a> {
     }
 
     pub(crate) fn solve(&mut self, bound: usize, bounds: &[usize], file_name: &str) {
-        let linear = HyperLTL::Unary(UnOp::Negation, Box::new(self.specification.ltl()));
+        let linear = HyperLTL::Appl(Op::Negation, vec![self.specification.ltl()]);
 
         println!("build automaton");
 
@@ -146,7 +146,11 @@ impl<'a> BoSyEncoding<'a> {
 
         let mut file = std::fs::File::create(file_name).expect("file creation failed");
         let mut buf_writer = BufWriter::new(file);
-        writeln!(buf_writer, "{}\n(check-sat)\n", constraints);
+        writeln!(
+            buf_writer,
+            "(set-option :smt.ematching false)\n(set-option :smt.mbqi true)\n{}\n(check-sat)\n",
+            constraints
+        );
 
         //println!("{}\n(check-sat)\n", constraints);
 
@@ -284,7 +288,7 @@ impl<'a> BoSyEncoding<'a> {
                         in_out_map.insert(
                             format!(
                                 "{}",
-                                HyperLTL::Proposition(i.to_string(), Some(path_var.to_string()))
+                                HyperLTL::Prop(i.to_string(), Some(path_var.to_string()))
                             ),
                             Term::new_ident(&ident),
                         );
@@ -310,10 +314,7 @@ impl<'a> BoSyEncoding<'a> {
                                 .map(|ele| Term::new_ident(ele)),
                         );
                         in_out_map.insert(
-                            format!(
-                                "{}",
-                                HyperLTL::Proposition(i.to_string(), Some(path_var.clone()))
-                            ),
+                            format!("{}", HyperLTL::Prop(i.to_string(), Some(path_var.clone()))),
                             Term::new_appl(in_label.clone(), in_label_args.clone()),
                         );
 
@@ -339,7 +340,7 @@ impl<'a> BoSyEncoding<'a> {
                         in_out_map.insert(
                             format!(
                                 "{}",
-                                HyperLTL::Proposition(o.to_string(), Some(path_var.to_string()))
+                                HyperLTL::Prop(o.to_string(), Some(path_var.to_string()))
                             ),
                             Term::new_appl(ident.clone(), label_appl),
                         );
@@ -507,7 +508,7 @@ impl<'a> BoSyEncoding<'a> {
             //println!("{}", hyper);
             //println!("{}", hyper.get_body());
 
-            let negated_hyper = HyperLTL::Unary(UnOp::Negation, Box::new(hyper.get_body().clone()));
+            let negated_hyper = HyperLTL::Appl(Op::Negation, vec![hyper.get_body().clone()]);
 
             let automaton = match LTL2Automaton::Spot.to_ucw(negated_hyper) {
                 Err(err) => {

@@ -1,4 +1,4 @@
-use hyperltl::{BinOp, HyperLTL};
+use hyperltl::{Op, HyperLTL};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -110,19 +110,19 @@ impl Specification {
         let assumptions = self
             .assumptions
             .iter()
-            .fold(HyperLTL::Literal(true), |val, ele| {
-                HyperLTL::Binary(BinOp::Conjunction, Box::new(val), Box::new(ele.clone()))
+            .fold(HyperLTL::Appl(Op::True, vec![]), |val, ele| {
+                HyperLTL::Appl(Op::Conjunction, vec![val, ele.clone()])
             });
         let guarantees = self
             .guarantees
             .iter()
-            .fold(HyperLTL::Literal(true), |val, ele| {
-                HyperLTL::Binary(BinOp::Conjunction, Box::new(val), Box::new(ele.clone()))
+            .fold(HyperLTL::Appl(Op::True, vec![]), |val, ele| {
+                HyperLTL::Appl(Op::Conjunction, vec![val, ele.clone()])
             });
-        HyperLTL::Binary(
-            BinOp::Implication,
-            Box::new(assumptions),
-            Box::new(guarantees),
+        HyperLTL::Appl(
+            Op::Implication,
+            vec![assumptions,
+            guarantees],
         )
     }
 }
