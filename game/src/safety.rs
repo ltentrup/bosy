@@ -8,7 +8,7 @@ pub struct SafetyGame<'a> {
     pub(crate) uncontrollables: Vec<CuddNode<'a>>,
     pub(crate) latches: Vec<CuddNode<'a>>,
     pub(crate) compose: Vec<CuddNode<'a>>,
-    pub(crate) initial: CuddNode<'a>,
+    pub(crate) initial_condition: CuddNode<'a>,
     pub(crate) safety_condition: CuddNode<'a>,
 
     pub(crate) controllable_names: Vec<String>,
@@ -68,7 +68,7 @@ impl<'a> SafetyGameSolver<'a> {
 
             fixpoint = safe_states.clone();
             safe_states.and_assign(&self.pre_system(safe_states.clone()));
-            if !self.instance.initial.leq(&safe_states) {
+            if !self.instance.initial_condition.leq(&safe_states) {
                 // unrealizable
                 return None;
             }

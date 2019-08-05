@@ -4,4 +4,5 @@ extern crate pest_derive;
 
 mod aiger;
 pub mod app;
+pub mod bounded;
 pub mod safety;

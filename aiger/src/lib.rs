@@ -34,7 +34,7 @@ impl Aiger {
     }
 
     pub fn from_str(content: &str) -> Result<Self, String> {
-        let mut aiger = Self::new();
+        let aiger = Self::new();
 
         let c_str = CString::new(content).expect("CString::new failed");
         let ptr = c_str.as_ptr();

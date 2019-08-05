@@ -10,6 +10,8 @@ smtlib = { path = "../smtlib" }
 bosy = { path="../bosy" }
 cudd = { path="../cudd" }
 aiger = { path="../aiger" }
+log = { version = "0.4.8", features = ["release_max_level_warn"] }
+simplelog = "0.6.0"
 pest = "^2.0"         # parser generator
 pest_derive = "^2.0"
 clap = "2.32.0"       # parsing command line arguments

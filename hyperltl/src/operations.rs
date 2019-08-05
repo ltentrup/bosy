@@ -258,6 +258,19 @@ impl HyperLTL {
         }
     }
 
+    /// checks whether an LTL formula is an invariant, i.e., of the form `G (propositional)`
+    fn is_reccurrence(&self) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(Globally, inner) => match &inner[0] {
+                Appl(Finally, inner) => inner[0].is_propositional(),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     pub fn partition(self) -> Result<LTLPartitioning, ()> {
         assert!(self.is_ltl());
 
@@ -332,6 +345,10 @@ impl HyperLTL {
             safety_assumptions
                 .into_iter()
                 .partition(|subf| subf.is_prime_invariant());
+        let (reccurrence_assumptions, liveness_assumptions): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            liveness_assumptions
+                .into_iter()
+                .partition(|subf| subf.is_reccurrence());
 
         let (safety_guarantees, liveness_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) = guarantees
             .into_iter()
@@ -348,6 +365,10 @@ impl HyperLTL {
             safety_guarantees
                 .into_iter()
                 .partition(|subf| subf.is_prime_invariant());
+        let (reccurrence_guarantees, liveness_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            liveness_guarantees
+                .into_iter()
+                .partition(|subf| subf.is_reccurrence());
 
         Ok(LTLPartitioning {
             preset_assumptions,
@@ -358,6 +379,8 @@ impl HyperLTL {
             prime_invariant_guarantees,
             safety_assumptions,
             safety_guarantees,
+            reccurrence_assumptions,
+            reccurrence_guarantees,
             liveness_assumptions,
             liveness_guarantees,
         })
@@ -366,16 +389,18 @@ impl HyperLTL {
 
 #[derive(Debug, Default)]
 pub struct LTLPartitioning {
-    preset_assumptions: Vec<HyperLTL>,
-    preset_guarantees: Vec<HyperLTL>,
-    invariant_assumptions: Vec<HyperLTL>,
-    invariant_guarantees: Vec<HyperLTL>,
-    prime_invariant_assumptions: Vec<HyperLTL>,
-    prime_invariant_guarantees: Vec<HyperLTL>,
-    safety_assumptions: Vec<HyperLTL>,
-    safety_guarantees: Vec<HyperLTL>,
-    liveness_assumptions: Vec<HyperLTL>,
-    liveness_guarantees: Vec<HyperLTL>,
+    pub preset_assumptions: Vec<HyperLTL>,
+    pub preset_guarantees: Vec<HyperLTL>,
+    pub invariant_assumptions: Vec<HyperLTL>,
+    pub invariant_guarantees: Vec<HyperLTL>,
+    pub prime_invariant_assumptions: Vec<HyperLTL>,
+    pub prime_invariant_guarantees: Vec<HyperLTL>,
+    pub safety_assumptions: Vec<HyperLTL>,
+    pub safety_guarantees: Vec<HyperLTL>,
+    pub reccurrence_assumptions: Vec<HyperLTL>,
+    pub reccurrence_guarantees: Vec<HyperLTL>,
+    pub liveness_assumptions: Vec<HyperLTL>,
+    pub liveness_guarantees: Vec<HyperLTL>,
 }
 impl std::fmt::Display for LTLPartitioning {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -428,6 +453,23 @@ impl std::fmt::Display for LTLPartitioning {
         }
         writeln!(f, "safety guarantees ({}):", self.safety_guarantees.len())?;
         for subf in &self.safety_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+
+        writeln!(
+            f,
+            "reccurrence assumptions ({}):",
+            self.reccurrence_assumptions.len()
+        )?;
+        for subf in &self.reccurrence_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(
+            f,
+            "reccurrence guarantees ({}):",
+            self.reccurrence_guarantees.len()
+        )?;
+        for subf in &self.reccurrence_guarantees {
             writeln!(f, "\t{}", subf)?;
         }
 

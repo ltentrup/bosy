@@ -41,7 +41,7 @@ impl Config {
         let aiger = Aiger::from_str(&contents)?;
         let manager = CuddManager::new();
         manager.set_auto_dyn(CuddReordering::GroupSift);
-        let safety_game = SafetyGame::from(&aiger, &manager);
+        let safety_game = SafetyGame::from_aiger(&aiger, &manager);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         if solver.solve().is_none() {
             println!("unrealizable");

@@ -12,7 +12,7 @@ pub struct Specification {
     pub(crate) hyper: Option<Vec<HyperLTL>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Semantics {
     #[serde(rename(serialize = "mealy", deserialize = "mealy"))]
     Mealy,
@@ -133,6 +133,18 @@ impl Specification {
 
     pub fn hyper(&self) -> &Option<Vec<HyperLTL>> {
         &self.hyper
+    }
+
+    pub fn semantics(&self) -> Semantics {
+        self.semantics
+    }
+
+    pub fn inputs(&self) -> &[String] {
+        &self.inputs
+    }
+
+    pub fn outputs(&self) -> &[String] {
+        &self.outputs
     }
 }
 

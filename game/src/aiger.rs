@@ -5,7 +5,7 @@ use maplit::hashmap;
 use std::collections::HashMap;
 
 impl<'a> SafetyGame<'a> {
-    pub fn from(aiger: &Aiger, manager: &'a CuddManager) -> Self {
+    pub fn from_aiger(aiger: &Aiger, manager: &'a CuddManager) -> Self {
         assert!(aiger.is_reencoded());
 
         let mut controllable_lits: Vec<AigerLit> = Vec::new();
@@ -83,7 +83,7 @@ impl<'a> SafetyGame<'a> {
             cache.insert(and.lhs(), node);
         }
 
-        let initial =
+        let initial_condition =
             latches
                 .iter()
                 .zip(aiger.latches())
@@ -111,7 +111,7 @@ impl<'a> SafetyGame<'a> {
             uncontrollables,
             latches,
             compose,
-            initial,
+            initial_condition,
             safety_condition,
 
             controllable_names,
@@ -150,7 +150,7 @@ unrealizable
         .unwrap();
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from(&aiger, &manager);
+        let safety_game = SafetyGame::from_aiger(&aiger, &manager);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }

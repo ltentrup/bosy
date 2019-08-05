@@ -155,6 +155,28 @@ impl<'a> CuddNode<'a> {
         *self = CuddNode::new(&self.manager, result)
     }
 
+    pub fn implies(self, other: &CuddNode) -> Self {
+        assert_eq!(self.manager, other.manager);
+        // !self || other
+        let result = unsafe { Cudd_bddOr(self.manager.ptr, Cudd_Not(self.node), other.node) };
+        self.check_return_value(result);
+        CuddNode::new(&self.manager, result)
+    }
+
+    pub fn xnor(self, other: &CuddNode) -> Self {
+        assert_eq!(self.manager, other.manager);
+        let result = unsafe { Cudd_bddXnor(self.manager.ptr, self.node, other.node) };
+        self.check_return_value(result);
+        CuddNode::new(&self.manager, result)
+    }
+
+    pub fn xor(self, other: &CuddNode) -> Self {
+        assert_eq!(self.manager, other.manager);
+        let result = unsafe { Cudd_bddXor(self.manager.ptr, self.node, other.node) };
+        self.check_return_value(result);
+        CuddNode::new(&self.manager, result)
+    }
+
     pub fn vector_compose(self, vector: &[CuddNode]) -> Self {
         assert_eq!(vector.len(), unsafe { Cudd_ReadSize(self.manager.ptr) }
             as usize);
