@@ -24,7 +24,7 @@ impl<'a> BoSyEncoding<'a> {
 
         println!("build automaton");
 
-        let automaton = match LTL2Automaton::Spot.to_ucw(linear) {
+        let automaton = match LTL2Automaton::Spot.to_ucw(&linear) {
             Err(err) => {
                 eprintln!("failed to convert LTL to automaton");
                 eprintln!("{}", err);
@@ -510,7 +510,7 @@ impl<'a> BoSyEncoding<'a> {
 
             let negated_hyper = HyperLTL::Appl(Op::Negation, vec![hyper.get_body().clone()]);
 
-            let automaton = match LTL2Automaton::Spot.to_ucw(negated_hyper) {
+            let automaton = match LTL2Automaton::Spot.to_ucw(&negated_hyper) {
                 Err(err) => {
                     eprintln!("failed to convert LTL to automaton");
                     eprintln!("{}", err);

@@ -1,11 +1,11 @@
 use crate::logic::Logic;
 use std::collections::HashMap;
 
-pub(crate) mod conversion;
+pub mod conversion;
 mod dot;
 
 #[derive(Debug)]
-pub(crate) struct State<L: Logic> {
+pub struct State<L: Logic> {
     pub id: StateId,
     pub name: Option<String>,
     pub initial: bool,
@@ -28,7 +28,7 @@ impl<L: Logic> State<L> {
 type StateId = usize;
 
 #[derive(Debug)]
-pub(crate) struct CoBuchiAutomaton<L: Logic> {
+pub struct CoBuchiAutomaton<L: Logic> {
     manager: L::Manager,
     states: Vec<State<L>>,
     transitions: HashMap<StateId, HashMap<StateId, L>>,
@@ -65,11 +65,11 @@ impl<L: Logic> CoBuchiAutomaton<L> {
         outgoing.insert(target, guard);
     }
 
-    pub(crate) fn states(&self) -> &[State<L>] {
+    pub fn states(&self) -> &[State<L>] {
         &self.states
     }
 
-    pub(crate) fn outgoing(&self, state: &State<L>) -> impl Iterator<Item = (&State<L>, &L)> {
+    pub fn outgoing(&self, state: &State<L>) -> impl Iterator<Item = (&State<L>, &L)> {
         self.transitions[&state.id]
             .iter()
             .map(move |(&k, v)| (&self.states[k], v))

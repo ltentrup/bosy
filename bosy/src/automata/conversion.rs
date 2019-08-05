@@ -10,15 +10,12 @@ use std::process::Command;
 #[grammar = "automata/neverclaim.pest"]
 struct NeverClaimParser;
 
-pub(crate) enum LTL2Automaton {
+pub enum LTL2Automaton {
     Spot,
 }
 
 impl LTL2Automaton {
-    pub(crate) fn to_ucw(
-        &self,
-        spec: HyperLTL,
-    ) -> Result<CoBuchiAutomaton<smtlib::Term>, Box<Error>> {
+    pub fn to_ucw(&self, spec: &HyperLTL) -> Result<CoBuchiAutomaton<smtlib::Term>, Box<Error>> {
         assert!(spec.is_quantifier_free());
         //let test = Command::new("pwd").output();
         //println!("{:?}", test);
@@ -135,7 +132,7 @@ accept_S2:
             )],
         );
         let converter = LTL2Automaton::Spot;
-        let automaton = converter.to_ucw(ltl)?;
+        let automaton = converter.to_ucw(&ltl)?;
         assert!(automaton.states.len() == 2);
         Ok(())
     }

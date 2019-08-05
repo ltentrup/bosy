@@ -3,7 +3,7 @@ extern crate hyperltl;
 extern crate pest_derive;
 
 pub mod app;
-pub(crate) mod automata;
+pub mod automata;
 pub(crate) mod encoding;
-pub(crate) mod logic;
+pub mod logic;
 pub mod specification;

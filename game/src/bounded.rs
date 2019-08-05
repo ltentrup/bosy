@@ -1,4 +1,5 @@
 use crate::safety::SafetyGame;
+use bosy::automata::conversion::LTL2Automaton;
 use bosy::specification::Specification;
 use cudd::{CuddManager, CuddNode};
 use hyperltl::{HyperLTL, Op};
@@ -68,8 +69,53 @@ impl<'a> SafetyGame<'a> {
             initial_condition.push(manager.zero());
         }
 
-        // (2.2) automata
-        // TODO
+        // (2.2) safety automata
+        for safety_assumption in &partitioned.safety_assumptions {
+            let automaton = match LTL2Automaton::Spot.to_ucw(&HyperLTL::new_unary(
+                Op::Negation,
+                safety_assumption.clone(),
+            )) {
+                Err(err) => {
+                    eprintln!("failed to convert LTL to automaton");
+                    eprintln!("{}", err);
+                    panic!();
+                }
+                Ok(automaton) => automaton,
+            };
+            println!("{}", safety_assumption);
+            println!("{:?}", automaton);
+        }
+        for safety_guarantee in &partitioned.safety_guarantees {
+            let automaton = match LTL2Automaton::Spot
+                .to_ucw(&HyperLTL::new_unary(Op::Negation, safety_guarantee.clone()))
+            {
+                Err(err) => {
+                    eprintln!("failed to convert LTL to automaton");
+                    eprintln!("{}", err);
+                    panic!();
+                }
+                Ok(automaton) => automaton,
+            };
+            println!("{}", safety_guarantee);
+            println!("{:?}", automaton);
+        }
+
+        // (2.3) liveness automata
+        for liveness_assumption in &partitioned.liveness_assumptions {
+            let automaton = match LTL2Automaton::Spot.to_ucw(&HyperLTL::new_unary(
+                Op::Negation,
+                liveness_assumption.clone(),
+            )) {
+                Err(err) => {
+                    eprintln!("failed to convert LTL to automaton");
+                    eprintln!("{}", err);
+                    panic!();
+                }
+                Ok(automaton) => automaton,
+            };
+            println!("{}", liveness_assumption);
+            println!("{:?}", automaton);
+        }
 
         // (3) build constraints from LTL/Automata
         let mut env_safe: Vec<CuddNode> = Vec::new();
@@ -187,13 +233,13 @@ impl<'a> SafetyGame<'a> {
                 },
                 HyperLTL::Prop(name, None) => {
                     if let Some(i) = input_names.iter().position(|n| n == name) {
-                        if primed {
+                        if !primed {
                             latches[i + 1].clone()
                         } else {
                             inputs[i].clone()
                         }
                     } else if let Some(o) = output_names.iter().position(|n| n == name) {
-                        if primed {
+                        if !primed {
                             latches[inputs.len() + o + 1].clone()
                         } else {
                             outputs[o].clone()
@@ -211,7 +257,7 @@ impl<'a> SafetyGame<'a> {
         for preset_assumption in &partitioned.preset_assumptions {
             env_safe.push(initial.clone().implies(&translate(
                 preset_assumption,
-                false,
+                true,
                 manager,
                 &uncontrollables,
                 &uncontrollable_names,
@@ -223,7 +269,7 @@ impl<'a> SafetyGame<'a> {
         for preset_guarantee in &partitioned.preset_guarantees {
             sys_safe.push(initial.clone().implies(&translate(
                 preset_guarantee,
-                false,
+                true,
                 manager,
                 &uncontrollables,
                 &uncontrollable_names,
@@ -238,7 +284,7 @@ impl<'a> SafetyGame<'a> {
             if let HyperLTL::Appl(Op::Globally, inner) = &invariant_assumption {
                 env_safe.push(translate(
                     &inner[0],
-                    false,
+                    true,
                     manager,
                     &uncontrollables,
                     &uncontrollable_names,
@@ -252,7 +298,7 @@ impl<'a> SafetyGame<'a> {
             if let HyperLTL::Appl(Op::Globally, inner) = &invariant_guarantee {
                 sys_safe.push(translate(
                     &inner[0],
-                    false,
+                    true,
                     manager,
                     &uncontrollables,
                     &uncontrollable_names,

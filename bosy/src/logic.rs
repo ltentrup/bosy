@@ -1,4 +1,4 @@
-pub(crate) trait Logic {
+pub trait Logic {
     type Manager;
 }
 
