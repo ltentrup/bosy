@@ -1,13 +1,13 @@
 //! This module contains the logic for the main `safety` binary.
 
 use crate::safety::{SafetyGame, SafetyGameSolver};
-use bosy::specification::Semantics;
 use aiger::Aiger;
+use bosy::specification::Semantics;
 use clap::{App, Arg};
+use cudd::{CuddManager, CuddReordering};
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use cudd::CuddManager;
 
 pub struct Config {
     filename: String,
@@ -40,6 +40,7 @@ impl Config {
 
         let aiger = Aiger::from_str(&contents)?;
         let manager = CuddManager::new();
+        manager.set_auto_dyn(CuddReordering::GroupSift);
         let safety_game = SafetyGame::from(&aiger, &manager);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         if solver.solve().is_none() {

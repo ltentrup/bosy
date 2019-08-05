@@ -26,6 +26,16 @@ pub struct CuddNode<'a> {
     node: *mut DdNode,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum CuddReordering {
+    Same,
+    None,
+    Random,
+    Sift,
+    GroupSift,
+    LazySift,
+}
+
 impl CuddManager {
     pub fn new() -> Self {
         let ptr = unsafe { Cudd_Init(0, 0, CUDD_UNIQUE_SLOTS, CUDD_CACHE_SLOTS, 0) };
@@ -38,13 +48,15 @@ impl CuddManager {
     }
 
     pub fn zero(&self) -> CuddNode {
-        CuddNode::new(self, unsafe {
-            Cudd_Not(Cudd_ReadOne(self.ptr))
-        })
+        CuddNode::new(self, unsafe { Cudd_Not(Cudd_ReadOne(self.ptr)) })
     }
 
     pub fn new_var(&self) -> CuddNode {
         CuddNode::new(self, unsafe { Cudd_bddNewVar(self.ptr) })
+    }
+
+    pub fn set_auto_dyn(&self, reordering: CuddReordering) {
+        unsafe { Cudd_AutodynEnable(self.ptr, reordering.c_repr()) }
     }
 }
 
@@ -89,18 +101,21 @@ impl<'a> CuddNode<'a> {
     }
 
     pub fn set_primary_input(&mut self) {
-        let result = unsafe { Cudd_bddSetPiVar(self.manager.ptr, self.index().try_into().unwrap()) };
+        let result =
+            unsafe { Cudd_bddSetPiVar(self.manager.ptr, self.index().try_into().unwrap()) };
         assert!(result > 0);
     }
 
     pub fn set_present_state(&mut self) {
-        let result = unsafe { Cudd_bddSetPsVar(self.manager.ptr, self.index().try_into().unwrap()) };
+        let result =
+            unsafe { Cudd_bddSetPsVar(self.manager.ptr, self.index().try_into().unwrap()) };
         assert!(result > 0);
     }
 
     pub fn and_abstract(self, and: &CuddNode, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
-        let result = unsafe { Cudd_bddAndAbstract(self.manager.ptr, self.node, and.node, cube.node) };
+        let result =
+            unsafe { Cudd_bddAndAbstract(self.manager.ptr, self.node, and.node, cube.node) };
         self.check_return_value(result);
         CuddNode::new(&self.manager, result)
     }
@@ -205,6 +220,20 @@ impl<'a> std::ops::BitOr for CuddNode<'a> {
         assert_eq!(self.manager, rhs.manager);
         let result = unsafe { Cudd_bddOr(self.manager.ptr, self.node, rhs.node) };
         CuddNode::new(&self.manager, result)
+    }
+}
+
+impl CuddReordering {
+    fn c_repr(self) -> Cudd_ReorderingType {
+        use CuddReordering::*;
+        match self {
+            Same => Cudd_ReorderingType_CUDD_REORDER_SAME,
+            None => Cudd_ReorderingType_CUDD_REORDER_NONE,
+            Random => Cudd_ReorderingType_CUDD_REORDER_RANDOM,
+            Sift => Cudd_ReorderingType_CUDD_REORDER_SIFT,
+            GroupSift => Cudd_ReorderingType_CUDD_REORDER_GROUP_SIFT,
+            LazySift => Cudd_ReorderingType_CUDD_REORDER_LAZY_SIFT,
+        }
     }
 }
 

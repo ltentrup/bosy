@@ -102,7 +102,7 @@ impl<'a> SafetyGame<'a> {
         );
 
         let safety_condition = aiger.outputs().fold(manager.one(), |safe, output| {
-            lookup_literal(&cache, &output.lit())
+            safe.and(&!lookup_literal(&cache, &output.lit()))
         });
 
         SafetyGame {
