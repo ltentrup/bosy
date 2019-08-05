@@ -231,8 +231,10 @@ mod tests {
                     HyperLTL::Prop("a".into(), None),
                     HyperLTL::Appl(
                         Op::Conjunction,
-                        vec![HyperLTL::Prop("b".into(), None),
-                        HyperLTL::Prop("c".into(), None)]
+                        vec![
+                            HyperLTL::Prop("b".into(), None),
+                            HyperLTL::Prop("c".into(), None)
+                        ]
                     )
                 ]
             )

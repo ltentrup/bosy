@@ -1,0 +1,15 @@
+[package]
+name = "cudd"
+version = "0.1.0"
+authors = ["Leander Tentrup <tentrup@react.uni-saarland.de>"]
+edition = "2018"
+build = "build.rs"
+
+exclude = []
+
+[dependencies]
+libc = "0.2.0"
+
+[build-dependencies]
+autotools = "0.2"
+bindgen = "0.50"

@@ -5,4 +5,7 @@ members = [
     "hyperltl",
     "smtlib",
     "bosy",
+    "game",
+    "cudd",
+    "aiger"
 ]

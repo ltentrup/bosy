@@ -63,7 +63,10 @@ fn build_term(instance: &mut Instance, pairs: Pairs<Rule>) -> Term {
                 }
 
                 //let ident = instance.declare_const(name, Sort::BOOL);
-                Term::new_ident(&ident.expect(&format!("all variables have to be bound before parsing, was `{}`", name)))
+                Term::new_ident(&ident.expect(&format!(
+                    "all variables have to be bound before parsing, was `{}`",
+                    name
+                )))
             }
             Rule::primary_expression => build_term(instance, pair.into_inner()),
             Rule::infix_expression => build_term(instance, pair.into_inner()),

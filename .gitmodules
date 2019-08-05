@@ -1,0 +1,3 @@
+[submodule "cudd/cudd"]
+	path = cudd/cudd
+	url = https://github.com/ivmai/cudd.git

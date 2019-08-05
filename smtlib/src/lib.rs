@@ -413,7 +413,7 @@ mod tests {
         let script = format!("{}", instance);
         assert_eq!(
             script,
-            "(declare-const a Bool)\n(declare-const b Bool)\n(assert (and a b))\n"
+            "(declare-const a Bool)\n(declare-const b Bool)\n(assert (and a b )\n\t)\n"
         )
     }
 }

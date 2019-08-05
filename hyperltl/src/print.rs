@@ -38,8 +38,9 @@ impl std::fmt::Display for super::Op {
             Exclusion => write!(f, "⊕"),
             Equivalence => write!(f, "↔"),
             Until => write!(f, "U"),
-            WeakUntil => write!(f, "W"),
             Release => write!(f, "R"),
+            WeakUntil => write!(f, "W"),
+            DualWeakUntil => write!(f, "M"),
             True => write!(f, "⊤"),
             False => write!(f, "⊥"),
         }

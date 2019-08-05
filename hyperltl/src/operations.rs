@@ -5,6 +5,24 @@ use super::*;
 use std::collections::HashSet;
 
 impl HyperLTL {
+    fn check_arity(&self) {
+        match self {
+            Quant(_, _, scope) => scope.check_arity(),
+            Appl(op, inner) => {
+                inner.iter().for_each(|ele| ele.check_arity());
+                match op.arity() {
+                    Some(arity) => assert_eq!(arity, inner.len()),
+                    None => {}
+                }
+            }
+            Prop(_, _) => {}
+        }
+    }
+
+    pub fn is_ltl(&self) -> bool {
+        self.is_quantifier_free()
+    }
+
     /// Checks if a formula contains no quantifier, i.e., is LTL
     pub fn is_quantifier_free(&self) -> bool {
         match self {
@@ -77,12 +95,30 @@ impl HyperLTL {
     }
 
     /// Brings formula to negation normal form (NNF) and collapses consecutive quantifier of the same type
-    fn normalize(self) -> Self {
-        self.collapse_quantifier().to_nnf(false)
+    pub fn normalize(mut self) -> Self {
+        self.check_arity();
+        self.remove_derived();
+        self.to_nnf(false).flatten()
     }
 
-    fn collapse_quantifier(self) -> Self {
-        unimplemented!();
+    /// Removes all operators that do not have a dual operation, i.e., `Implication`
+    fn remove_derived(&mut self) {
+        match self {
+            Quant(kind, vars, scope) => scope.remove_derived(),
+            Appl(op, inner) => {
+                inner.iter_mut().for_each(|subf| subf.remove_derived());
+                match op {
+                    Implication => {
+                        // euivalent to `!lhs || rhs`
+                        let lhs = inner.remove(0);
+                        inner.insert(0, Appl(Negation, vec![lhs]));
+                        *op = Disjunction;
+                    }
+                    _ => {}
+                }
+            }
+            Prop(_, _) => {}
+        }
     }
 
     fn to_nnf(self, negated: bool) -> HyperLTL {
@@ -93,9 +129,325 @@ impl HyperLTL {
                 }
                 Quant(qtype, params, scope.to_nnf(negated).into())
             }
-            Appl(Negation, expr) => unimplemented!(),
-            _ => unimplemented!(),
+            Appl(Negation, expr) => {
+                assert_eq!(expr.len(), 1);
+                expr.into_iter().next().unwrap().to_nnf(!negated)
+            }
+            Appl(mut op, mut inner) => {
+                if negated {
+                    op.negate();
+                }
+                inner = inner.into_iter().map(|subf| subf.to_nnf(negated)).collect();
+                Appl(op, inner)
+            }
+            Prop(name, path) => {
+                if negated {
+                    Appl(Negation, vec![Prop(name, path)])
+                } else {
+                    Prop(name, path)
+                }
+            }
         }
+    }
+
+    fn flatten(self) -> HyperLTL {
+        match self {
+            Quant(qtype, mut params, mut scope) => {
+                scope = match *scope {
+                    Quant(other_qtype, other_params, other_scope) => {
+                        if qtype == other_qtype {
+                            // quantifiers can be collapsed
+                            params.extend(other_params);
+                            let new_quant = Quant(qtype, params, other_scope);
+                            return new_quant.flatten();
+                        } else {
+                            Quant(other_qtype, other_params, other_scope)
+                                .flatten()
+                                .into()
+                        }
+                    }
+                    _ => scope.flatten().into(),
+                };
+                Quant(qtype, params, scope)
+            }
+            Appl(op, mut inner) => {
+                inner = inner.into_iter().map(|subf| subf.flatten()).collect();
+                let mut new_inner = Vec::new();
+                for subf in inner.into_iter() {
+                    match subf {
+                        Appl(other_op, other_inner) => {
+                            if other_op == op {
+                                new_inner.extend(other_inner)
+                            } else {
+                                new_inner.push(Appl(other_op, other_inner))
+                            }
+                        }
+                        subf => new_inner.push(subf),
+                    }
+                }
+                Appl(op, new_inner)
+            }
+            Prop(name, path) => Prop(name, path),
+        }
+    }
+
+    /// checks whether an LTL formula is in the syntactic safety fragment
+    fn is_syntactic_safe(&self) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(op, inner) => op.is_safety() && inner.iter().all(|subf| subf.is_syntactic_safe()),
+            Prop(_, _) => true,
+            _ => unreachable!(),
+        }
+    }
+
+    /// checks whether an LTL formula is an invariant, i.e., of the form `G (propositional)`
+    fn is_invariant(&self) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(Globally, inner) => inner[0].is_propositional(),
+            _ => false,
+        }
+    }
+
+    /// checks whether an LTL formula is propositional, i.e., does not contain temporal operators
+    fn is_propositional(&self) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(op, inner) => {
+                op.is_propositional() && inner.iter().all(|subf| subf.is_propositional())
+            }
+            Prop(_, _) => true,
+            _ => unreachable!(),
+        }
+    }
+
+    /// checks whether an LTL formula is invariant up to one Next operator, e.g., `G (a <-> X a)`
+    fn is_prime_invariant(&self) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(Globally, inner) => inner[0].is_nearly_propositional(false),
+            _ => false,
+        }
+    }
+
+    /// checks whether an LTL formula is nearly propositional, i.e., the only temporal operator is `X` with nesting depth 1
+    fn is_nearly_propositional(&self, mut seen_x: bool) -> bool {
+        assert!(self.is_ltl());
+
+        match self {
+            Appl(op, inner) => {
+                if *op == Next {
+                    if seen_x {
+                        return false;
+                    }
+                    seen_x = true;
+                } else if !op.is_propositional() {
+                    return false;
+                }
+                inner
+                    .iter()
+                    .all(|subf| subf.is_nearly_propositional(seen_x))
+            }
+            Prop(_, _) => true,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn partition(self) -> Result<LTLPartitioning, ()> {
+        assert!(self.is_ltl());
+
+        let mut assumptions: Vec<HyperLTL> = Vec::new();
+        let mut guarantee: Option<HyperLTL> = None;
+
+        match self {
+            Appl(Disjunction, inner) => {
+                // may be of form assumptions => guarantees
+                for subf in inner.into_iter() {
+                    match subf {
+                        Appl(Conjunction, inner) => {
+                            match guarantee {
+                                None => guarantee = Some(Appl(Conjunction, inner)),
+                                Some(Appl(Conjunction, other)) => {
+                                    // check which one has more conjuncts
+                                    if inner.len() > other.len() {
+                                        // switch
+                                        guarantee = Some(Appl(Conjunction, inner));
+                                        assumptions.push(Appl(Conjunction, other));
+                                    } else {
+                                        guarantee = Some(Appl(Conjunction, other));
+                                        assumptions.push(Appl(Conjunction, inner));
+                                    }
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => {
+                            assumptions.push(subf);
+                        }
+                    }
+                }
+            }
+            Appl(Conjunction, inner) => {
+                // no (global) assumptions
+                guarantee = Some(Appl(Conjunction, inner));
+            }
+            Quant(_, _, _) => unreachable!(),
+            f => guarantee = Some(f),
+        }
+
+        let guarantees = if let Some(Appl(Conjunction, inner)) = guarantee {
+            inner
+        } else {
+            return Err(());
+        };
+
+        // negate assumptions
+        assumptions = assumptions
+            .into_iter()
+            .map(|subf| subf.to_nnf(true))
+            .collect();
+
+        //println!("assumptions {:?}", assumptions);
+        //println!("guarantees {:?}", guarantees);
+
+        // filter
+        let (safety_assumptions, liveness_assumptions): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            assumptions
+                .into_iter()
+                .partition(|subf| subf.is_syntactic_safe());
+        let (invariant_assumptions, safety_assumptions): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_assumptions
+                .into_iter()
+                .partition(|subf| subf.is_invariant());
+        let (preset_assumptions, safety_assumptions): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_assumptions
+                .into_iter()
+                .partition(|subf| subf.is_propositional());
+        let (prime_invariant_assumptions, safety_assumptions): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_assumptions
+                .into_iter()
+                .partition(|subf| subf.is_prime_invariant());
+
+        let (safety_guarantees, liveness_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) = guarantees
+            .into_iter()
+            .partition(|subf| subf.is_syntactic_safe());
+        let (invariant_guarantees, safety_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_guarantees
+                .into_iter()
+                .partition(|subf| subf.is_invariant());
+        let (preset_guarantees, safety_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_guarantees
+                .into_iter()
+                .partition(|subf| subf.is_propositional());
+        let (prime_invariant_guarantees, safety_guarantees): (Vec<HyperLTL>, Vec<HyperLTL>) =
+            safety_guarantees
+                .into_iter()
+                .partition(|subf| subf.is_prime_invariant());
+
+        Ok(LTLPartitioning {
+            preset_assumptions,
+            preset_guarantees,
+            invariant_assumptions,
+            invariant_guarantees,
+            prime_invariant_assumptions,
+            prime_invariant_guarantees,
+            safety_assumptions,
+            safety_guarantees,
+            liveness_assumptions,
+            liveness_guarantees,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct LTLPartitioning {
+    preset_assumptions: Vec<HyperLTL>,
+    preset_guarantees: Vec<HyperLTL>,
+    invariant_assumptions: Vec<HyperLTL>,
+    invariant_guarantees: Vec<HyperLTL>,
+    prime_invariant_assumptions: Vec<HyperLTL>,
+    prime_invariant_guarantees: Vec<HyperLTL>,
+    safety_assumptions: Vec<HyperLTL>,
+    safety_guarantees: Vec<HyperLTL>,
+    liveness_assumptions: Vec<HyperLTL>,
+    liveness_guarantees: Vec<HyperLTL>,
+}
+impl std::fmt::Display for LTLPartitioning {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "preset assumptions ({}):", self.preset_assumptions.len())?;
+        for subf in &self.preset_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(f, "preset guarantees ({}):", self.preset_guarantees.len())?;
+        for subf in &self.preset_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+
+        writeln!(
+            f,
+            "invariant assumptions ({}):",
+            self.invariant_assumptions.len()
+        )?;
+        for subf in &self.invariant_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(
+            f,
+            "invariant guarantees ({}):",
+            self.invariant_guarantees.len()
+        )?;
+        for subf in &self.invariant_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+
+        writeln!(
+            f,
+            "prime invariant assumptions ({}):",
+            self.prime_invariant_assumptions.len()
+        )?;
+        for subf in &self.prime_invariant_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(
+            f,
+            "prime invariant guarantees ({}):",
+            self.prime_invariant_guarantees.len()
+        )?;
+        for subf in &self.prime_invariant_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+
+        writeln!(f, "safety assumptions ({}):", self.safety_assumptions.len())?;
+        for subf in &self.safety_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(f, "safety guarantees ({}):", self.safety_guarantees.len())?;
+        for subf in &self.safety_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+
+        writeln!(
+            f,
+            "liveness assumptions ({}):",
+            self.liveness_assumptions.len()
+        )?;
+        for subf in &self.liveness_assumptions {
+            writeln!(f, "\t{}", subf)?;
+        }
+        writeln!(
+            f,
+            "liveness guarantees ({}):",
+            self.liveness_guarantees.len()
+        )?;
+        for subf in &self.liveness_guarantees {
+            writeln!(f, "\t{}", subf)?;
+        }
+        Ok(())
     }
 }
 
@@ -120,6 +472,7 @@ impl Op {
             Equivalence => Exclusion,
             Until => Release,
             Release => Until,
+            WeakUntil => DualWeakUntil,
             True => False,
             False => True,
             _ => unreachable!(),
@@ -175,9 +528,86 @@ mod tests {
                 ),
             ],
         );
-        let Props = expr.get_propositions();
-        assert!(Props.contains("a"));
-        assert!(Props.contains("b"));
-        assert!(Props.contains("c"));
+        let props = expr.get_propositions();
+        assert!(props.contains("a"));
+        assert!(props.contains("b"));
+        assert!(props.contains("c"));
+    }
+
+    #[test]
+    fn test_removed_derived() {
+        let mut before = Appl(
+            Implication,
+            vec![Prop("a".into(), None), Prop("b".into(), None)],
+        );
+        let after = Appl(
+            Disjunction,
+            vec![
+                Appl(Negation, vec![Prop("a".into(), None)]),
+                Prop("b".into(), None),
+            ],
+        );
+        before.remove_derived();
+
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn test_nnf_transformation() {
+        let a = Prop("a".into(), None);
+        let b = Prop("b".into(), None);
+        let before = Appl(
+            Negation,
+            vec![Appl(
+                Disjunction,
+                vec![
+                    Appl(Globally, vec![a.clone()]),
+                    Appl(Until, vec![a.clone(), b.clone()]),
+                ],
+            )],
+        );
+        let after = HyperLTL::new_binary(
+            Conjunction,
+            HyperLTL::new_unary(Finally, HyperLTL::new_unary(Negation, a.clone())),
+            HyperLTL::new_binary(
+                Release,
+                HyperLTL::new_unary(Negation, a.clone()),
+                HyperLTL::new_unary(Negation, b.clone()),
+            ),
+        );
+
+        assert_eq!(before.to_nnf(false), after);
+    }
+
+    #[test]
+    fn test_flatten() {
+        let a = Prop("a".into(), None);
+        let b = Prop("b".into(), None);
+        let c = Prop("c".into(), None);
+
+        let before = HyperLTL::new_binary(
+            Conjunction,
+            HyperLTL::new_binary(
+                Conjunction,
+                a.clone(),
+                HyperLTL::new_binary(Conjunction, b.clone(), c.clone()),
+            ),
+            HyperLTL::new_binary(
+                Disjunction,
+                HyperLTL::new_binary(Disjunction, a.clone(), b.clone()),
+                c.clone(),
+            ),
+        );
+        let after = Appl(
+            Conjunction,
+            vec![
+                a.clone(),
+                b.clone(),
+                c.clone(),
+                Appl(Disjunction, vec![a.clone(), b.clone(), c.clone()]),
+            ],
+        );
+
+        assert_eq!(before.flatten(), after);
     }
 }

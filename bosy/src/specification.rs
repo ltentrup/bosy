@@ -1,9 +1,10 @@
-use hyperltl::{Op, HyperLTL};
+use hyperltl::{HyperLTL, Op};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Specification {
+pub struct Specification {
+    pub(crate) semantics: Semantics,
     pub(crate) inputs: Vec<String>,
     pub(crate) outputs: Vec<String>,
     assumptions: Vec<HyperLTL>,
@@ -11,9 +12,17 @@ pub(crate) struct Specification {
     pub(crate) hyper: Option<Vec<HyperLTL>>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Semantics {
+    #[serde(rename(serialize = "mealy", deserialize = "mealy"))]
+    Mealy,
+    #[serde(rename(serialize = "moore", deserialize = "moore"))]
+    Moore,
+}
+
 impl Specification {
     /// Checks the given specification for problems and reports them
-    pub(crate) fn check(&self) -> Result<(), Vec<String>> {
+    pub fn check(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         let mut propositions: HashSet<&str> = HashSet::new();
 
@@ -105,7 +114,7 @@ impl Specification {
     }
 
     /// Returns the combination of assumptions and guarantees as a single LTL formula
-    pub(crate) fn ltl(&self) -> HyperLTL {
+    pub fn ltl(&self) -> HyperLTL {
         assert!(self.check().is_ok());
         let assumptions = self
             .assumptions
@@ -119,11 +128,11 @@ impl Specification {
             .fold(HyperLTL::Appl(Op::True, vec![]), |val, ele| {
                 HyperLTL::Appl(Op::Conjunction, vec![val, ele.clone()])
             });
-        HyperLTL::Appl(
-            Op::Implication,
-            vec![assumptions,
-            guarantees],
-        )
+        HyperLTL::Appl(Op::Implication, vec![assumptions, guarantees])
+    }
+
+    pub fn hyper(&self) -> &Option<Vec<HyperLTL>> {
+        &self.hyper
     }
 }
 
