@@ -4,14 +4,13 @@ use cudd::{CuddManager, CuddNode};
 use maplit::hashmap;
 use std::collections::HashMap;
 
-impl From<&Aiger> for SafetyGame {
-    fn from(aiger: &Aiger) -> SafetyGame {
+impl<'a> SafetyGame<'a> {
+    pub fn from(aiger: &Aiger, manager: &'a CuddManager) -> Self {
         assert!(aiger.is_reencoded());
 
         let mut controllable_lits: Vec<AigerLit> = Vec::new();
         let mut uncontrollable_lits: Vec<AigerLit> = Vec::new();
 
-        let mut manager = CuddManager::new();
         let mut cache: HashMap<AigerLit, CuddNode> = hashmap![AigerLit::FALSE => manager.zero()];
         let mut controllables: Vec<CuddNode> = Vec::new();
         let mut uncontrollables: Vec<CuddNode> = Vec::new();
@@ -65,7 +64,10 @@ impl From<&Aiger> for SafetyGame {
 
         assert_eq!(latches.len(), latch_names.len());
 
-        fn lookup_literal(cache: &HashMap<AigerLit, CuddNode>, lit: &AigerLit) -> CuddNode {
+        fn lookup_literal<'a>(
+            cache: &HashMap<AigerLit, CuddNode<'a>>,
+            lit: &AigerLit,
+        ) -> CuddNode<'a> {
             let (negated, normalized_lit) = lit.normalize();
             let bdd_node = cache[&normalized_lit].clone();
             if negated {
@@ -147,7 +149,8 @@ unrealizable
         )
         .unwrap();
 
-        let safety_game = SafetyGame::from(&aiger);
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from(&aiger, &manager);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }

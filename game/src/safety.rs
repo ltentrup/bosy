@@ -2,14 +2,14 @@ use bosy::specification::Semantics;
 use cudd::{CuddManager, CuddNode};
 
 #[derive(Debug)]
-pub struct SafetyGame {
-    pub(crate) manager: CuddManager,
-    pub(crate) controllables: Vec<CuddNode>,
-    pub(crate) uncontrollables: Vec<CuddNode>,
-    pub(crate) latches: Vec<CuddNode>,
-    pub(crate) compose: Vec<CuddNode>,
-    pub(crate) initial: CuddNode,
-    pub(crate) safety_condition: CuddNode,
+pub struct SafetyGame<'a> {
+    pub(crate) manager: &'a CuddManager,
+    pub(crate) controllables: Vec<CuddNode<'a>>,
+    pub(crate) uncontrollables: Vec<CuddNode<'a>>,
+    pub(crate) latches: Vec<CuddNode<'a>>,
+    pub(crate) compose: Vec<CuddNode<'a>>,
+    pub(crate) initial: CuddNode<'a>,
+    pub(crate) safety_condition: CuddNode<'a>,
 
     pub(crate) controllable_names: Vec<String>,
     pub(crate) uncontrollable_names: Vec<String>,
@@ -17,16 +17,16 @@ pub struct SafetyGame {
 }
 
 #[derive(Debug)]
-pub struct SafetyGameSolver {
-    instance: SafetyGame,
+pub struct SafetyGameSolver<'a> {
+    instance: SafetyGame<'a>,
     semantics: Semantics,
 
-    exiscube: CuddNode,
-    univcube: CuddNode,
+    exiscube: CuddNode<'a>,
+    univcube: CuddNode<'a>,
 }
 
-impl SafetyGameSolver {
-    pub fn new(instance: SafetyGame, semantics: Semantics) -> Self {
+impl<'a> SafetyGameSolver<'a> {
+    pub fn new(instance: SafetyGame<'a>, semantics: Semantics) -> Self {
         let exiscube = instance
             .controllables
             .iter()
@@ -43,7 +43,7 @@ impl SafetyGameSolver {
         }
     }
 
-    fn pre_system(&mut self, states: CuddNode) -> CuddNode {
+    fn pre_system(&mut self, states: CuddNode<'a>) -> CuddNode<'a> {
         match self.semantics {
             Semantics::Mealy => states
                 .vector_compose(&self.instance.compose)
@@ -57,7 +57,7 @@ impl SafetyGameSolver {
         }
     }
 
-    pub fn solve(&mut self) -> Option<CuddNode> {
+    pub fn solve(&mut self) -> Option<CuddNode<'a>> {
         let mut fixpoint = self.instance.manager.zero();
         let mut safe_states = self.instance.manager.one();
 

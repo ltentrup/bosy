@@ -15,49 +15,49 @@ fn Cudd_Not(node: *mut DdNode) -> *mut DdNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CuddManager {
-    manager: *mut DdManager,
+    ptr: *mut DdManager,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct CuddNode {
-    manager: *mut DdManager,
+pub struct CuddNode<'a> {
+    manager: &'a CuddManager,
     node: *mut DdNode,
 }
 
 impl CuddManager {
     pub fn new() -> Self {
-        let manager = unsafe { Cudd_Init(0, 0, CUDD_UNIQUE_SLOTS, CUDD_CACHE_SLOTS, 0) };
-        assert!(!manager.is_null());
-        Self { manager }
+        let ptr = unsafe { Cudd_Init(0, 0, CUDD_UNIQUE_SLOTS, CUDD_CACHE_SLOTS, 0) };
+        assert!(!ptr.is_null());
+        Self { ptr }
     }
 
     pub fn one(&self) -> CuddNode {
-        CuddNode::new(self.manager, unsafe { Cudd_ReadOne(self.manager) })
+        CuddNode::new(self, unsafe { Cudd_ReadOne(self.ptr) })
     }
 
     pub fn zero(&self) -> CuddNode {
-        CuddNode::new(self.manager, unsafe {
-            Cudd_Not(Cudd_ReadOne(self.manager))
+        CuddNode::new(self, unsafe {
+            Cudd_Not(Cudd_ReadOne(self.ptr))
         })
     }
 
     pub fn new_var(&self) -> CuddNode {
-        CuddNode::new(self.manager, unsafe { Cudd_bddNewVar(self.manager) })
+        CuddNode::new(self, unsafe { Cudd_bddNewVar(self.ptr) })
     }
 }
 
 impl Drop for CuddManager {
     fn drop(&mut self) {
         unsafe {
-            Cudd_Quit(self.manager);
+            Cudd_Quit(self.ptr);
         }
     }
 }
 
-impl CuddNode {
-    fn new(manager: *mut DdManager, node: *mut DdNode) -> Self {
+impl<'a> CuddNode<'a> {
+    fn new(manager: &'a CuddManager, node: *mut DdNode) -> Self {
         unsafe { Cudd_Ref(node) };
         Self { manager, node }
     }
@@ -66,13 +66,13 @@ impl CuddNode {
         if !val.is_null() {
             return;
         }
-        match unsafe { Cudd_ReadErrorCode(self.manager) } {
+        match unsafe { Cudd_ReadErrorCode(self.manager.ptr) } {
             Cudd_ErrorType_CUDD_MEMORY_OUT => panic!("CUDD: Out of memory"),
             Cudd_ErrorType_CUDD_TOO_MANY_NODES => panic!("CUDD: Too many nodes"),
             Cudd_ErrorType_CUDD_MAX_MEM_EXCEEDED => panic!("CUDD: Maximum memory exceeded"),
             Cudd_ErrorType_CUDD_TIMEOUT_EXPIRED => {
                 let lag = unsafe {
-                    Cudd_ReadElapsedTime(self.manager) - Cudd_ReadTimeLimit(self.manager)
+                    Cudd_ReadElapsedTime(self.manager.ptr) - Cudd_ReadTimeLimit(self.manager.ptr)
                 };
                 panic!("CUDD: Timeout expired.  Lag = {} ms", lag);
             }
@@ -89,122 +89,122 @@ impl CuddNode {
     }
 
     pub fn set_primary_input(&mut self) {
-        let result = unsafe { Cudd_bddSetPiVar(self.manager, self.index().try_into().unwrap()) };
+        let result = unsafe { Cudd_bddSetPiVar(self.manager.ptr, self.index().try_into().unwrap()) };
         assert!(result > 0);
     }
 
     pub fn set_present_state(&mut self) {
-        let result = unsafe { Cudd_bddSetPsVar(self.manager, self.index().try_into().unwrap()) };
+        let result = unsafe { Cudd_bddSetPsVar(self.manager.ptr, self.index().try_into().unwrap()) };
         assert!(result > 0);
     }
 
-    pub fn and_abstract(self, and: &CuddNode, cube: &CuddNode) -> CuddNode {
+    pub fn and_abstract(self, and: &CuddNode, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
-        let result = unsafe { Cudd_bddAndAbstract(self.manager, self.node, and.node, cube.node) };
+        let result = unsafe { Cudd_bddAndAbstract(self.manager.ptr, self.node, and.node, cube.node) };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
-    pub fn exist_abstract(self, cube: &CuddNode) -> CuddNode {
+    pub fn exist_abstract(self, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
-        let result = unsafe { Cudd_bddExistAbstract(self.manager, self.node, cube.node) };
+        let result = unsafe { Cudd_bddExistAbstract(self.manager.ptr, self.node, cube.node) };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
-    pub fn univ_abstract(self, cube: &CuddNode) -> CuddNode {
+    pub fn univ_abstract(self, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
-        let result = unsafe { Cudd_bddUnivAbstract(self.manager, self.node, cube.node) };
+        let result = unsafe { Cudd_bddUnivAbstract(self.manager.ptr, self.node, cube.node) };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
-    pub fn or(self, other: &CuddNode) -> CuddNode {
+    pub fn or(self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
-        let result = unsafe { Cudd_bddOr(self.manager, self.node, other.node) };
+        let result = unsafe { Cudd_bddOr(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
-    pub fn and(self, other: &CuddNode) -> CuddNode {
+    pub fn and(self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
-        let result = unsafe { Cudd_bddAnd(self.manager, self.node, other.node) };
+        let result = unsafe { Cudd_bddAnd(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
     pub fn and_assign(&mut self, other: &CuddNode) {
         assert_eq!(self.manager, other.manager);
-        let result = unsafe { Cudd_bddAnd(self.manager, self.node, other.node) };
+        let result = unsafe { Cudd_bddAnd(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
-        *self = CuddNode::new(self.manager, result)
+        *self = CuddNode::new(&self.manager, result)
     }
 
-    pub fn vector_compose(self, vector: &[CuddNode]) -> CuddNode {
-        assert_eq!(vector.len(), unsafe { Cudd_ReadSize(self.manager) }
+    pub fn vector_compose(self, vector: &[CuddNode]) -> Self {
+        assert_eq!(vector.len(), unsafe { Cudd_ReadSize(self.manager.ptr) }
             as usize);
         let result = {
             let mut vector: Vec<*mut DdNode> = vector.iter().map(|node| node.node).collect();
-            unsafe { Cudd_bddVectorCompose(self.manager, self.node, vector.as_mut_ptr()) }
+            unsafe { Cudd_bddVectorCompose(self.manager.ptr, self.node, vector.as_mut_ptr()) }
         };
         self.check_return_value(result);
-        CuddNode::new(self.manager, result)
+        CuddNode::new(&self.manager, result)
     }
 
     pub fn leq(&self, other: &CuddNode) -> bool {
         assert_eq!(self.manager, other.manager);
-        let result = unsafe { Cudd_bddLeq(self.manager, self.node, other.node) };
+        let result = unsafe { Cudd_bddLeq(self.manager.ptr, self.node, other.node) };
         result > 0
     }
 }
 
-impl Clone for CuddNode {
+impl<'a> Clone for CuddNode<'a> {
     fn clone(&self) -> Self {
-        Self::new(self.manager, self.node)
+        Self::new(&self.manager, self.node)
     }
 }
 
-impl Drop for CuddNode {
+impl<'a> Drop for CuddNode<'a> {
     fn drop(&mut self) {
         unsafe {
-            Cudd_RecursiveDeref(self.manager, self.node);
+            Cudd_RecursiveDeref(self.manager.ptr, self.node);
         }
     }
 }
 
-impl std::ops::Not for CuddNode {
-    type Output = CuddNode;
+impl<'a> std::ops::Not for CuddNode<'a> {
+    type Output = Self;
 
     fn not(self) -> Self {
-        CuddNode::new(self.manager, Cudd_Not(self.node))
+        CuddNode::new(&self.manager, Cudd_Not(self.node))
     }
 }
 
-impl std::ops::Not for &CuddNode {
-    type Output = CuddNode;
+impl<'a> std::ops::Not for &CuddNode<'a> {
+    type Output = CuddNode<'a>;
 
-    fn not(self) -> CuddNode {
-        CuddNode::new(self.manager, Cudd_Not(self.node))
+    fn not(self) -> Self::Output {
+        CuddNode::new(&self.manager, Cudd_Not(self.node))
     }
 }
 
-impl std::ops::BitAnd for CuddNode {
-    type Output = CuddNode;
+impl<'a> std::ops::BitAnd for CuddNode<'a> {
+    type Output = Self;
 
     fn bitand(self, rhs: CuddNode) -> Self {
         assert_eq!(self.manager, rhs.manager);
-        let result = unsafe { Cudd_bddAnd(self.manager, self.node, rhs.node) };
-        CuddNode::new(self.manager, result)
+        let result = unsafe { Cudd_bddAnd(self.manager.ptr, self.node, rhs.node) };
+        CuddNode::new(&self.manager, result)
     }
 }
 
-impl std::ops::BitOr for CuddNode {
-    type Output = CuddNode;
+impl<'a> std::ops::BitOr for CuddNode<'a> {
+    type Output = Self;
 
     fn bitor(self, rhs: CuddNode) -> Self {
         assert_eq!(self.manager, rhs.manager);
-        let result = unsafe { Cudd_bddOr(self.manager, self.node, rhs.node) };
-        CuddNode::new(self.manager, result)
+        let result = unsafe { Cudd_bddOr(self.manager.ptr, self.node, rhs.node) };
+        CuddNode::new(&self.manager, result)
     }
 }
 

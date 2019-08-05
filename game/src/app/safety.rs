@@ -7,6 +7,7 @@ use clap::{App, Arg};
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
+use cudd::CuddManager;
 
 pub struct Config {
     filename: String,
@@ -38,7 +39,8 @@ impl Config {
         file.read_to_string(&mut contents)?;
 
         let aiger = Aiger::from_str(&contents)?;
-        let safety_game = SafetyGame::from(&aiger);
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from(&aiger, &manager);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         if solver.solve().is_none() {
             println!("unrealizable");
