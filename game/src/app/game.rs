@@ -14,6 +14,7 @@ use std::process;
 pub struct Config {
     filename: String,
     verbosity: LevelFilter,
+    bound: u32,
 }
 
 impl Config {
@@ -35,6 +36,13 @@ impl Config {
                     .multiple(true)
                     .help("Sets the level of verbosity"),
             )
+            .arg(
+                Arg::with_name("BOUND")
+                    .help("Sets the bound (number of states in the implementation)")
+                    .long("--bound")
+                    .takes_value(true)
+                    .required(true),
+            )
             .get_matches_from(args);
 
         let filename = matches.value_of("INPUT").map(|s| s.to_string()).unwrap();
@@ -46,9 +54,15 @@ impl Config {
             3 | _ => LevelFilter::Trace,
         };
 
+        let bound = matches
+            .value_of("BOUND")
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap();
+
         Config {
             filename,
             verbosity,
+            bound,
         }
     }
 
@@ -70,7 +84,7 @@ impl Config {
 
         let spec: Specification = serde_json::from_str(&contents)?;
 
-        info!("specification {:#?}", spec);
+        info!("specification {:?}", spec);
 
         if let Err(errors) = spec.check() {
             eprintln!("Specification contains errors");
@@ -82,16 +96,16 @@ impl Config {
 
         assert!(spec.hyper().is_none());
 
-        let bound = 2;
+        let bound = self.bound;
 
         let manager = CuddManager::new();
         manager.set_auto_dyn(CuddReordering::GroupSift);
         let safety_game = SafetyGame::from_bosy(&spec, &manager, bound);
         let mut solver = SafetyGameSolver::new(safety_game, spec.semantics());
         if solver.solve().is_none() {
-            println!("unrealizable with bound {}", bound);
+            println!("result: unknown with bound {}", bound);
         } else {
-            println!("realizable with bound {}", bound);
+            println!("result: realizable with bound {}", bound);
         }
 
         Ok(())

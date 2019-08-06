@@ -170,9 +170,17 @@ impl<'a> CuddNode<'a> {
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn xor(self, other: &CuddNode) -> Self {
+    pub fn xor(&self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
         let result = unsafe { Cudd_bddXor(self.manager.ptr, self.node, other.node) };
+        self.check_return_value(result);
+        CuddNode::new(&self.manager, result)
+    }
+
+    pub fn ite(&self, lhs: &CuddNode, rhs: &CuddNode) -> Self {
+        assert_eq!(self.manager, lhs.manager);
+        assert_eq!(self.manager, rhs.manager);
+        let result = unsafe { Cudd_bddIte(self.manager.ptr, self.node, lhs.node, rhs.node) };
         self.check_return_value(result);
         CuddNode::new(&self.manager, result)
     }
@@ -192,6 +200,10 @@ impl<'a> CuddNode<'a> {
         assert_eq!(self.manager, other.manager);
         let result = unsafe { Cudd_bddLeq(self.manager.ptr, self.node, other.node) };
         result > 0
+    }
+
+    pub fn print_minterms(&self) {
+        unsafe { Cudd_PrintMinterm(self.manager.ptr, self.node) };
     }
 }
 

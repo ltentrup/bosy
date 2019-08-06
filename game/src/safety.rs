@@ -27,6 +27,11 @@ pub struct SafetyGameSolver<'a> {
 
 impl<'a> SafetyGameSolver<'a> {
     pub fn new(instance: SafetyGame<'a>, semantics: Semantics) -> Self {
+        assert_ne!(
+            &instance.initial_condition,
+            &instance.manager.zero(),
+            "there are no initial states"
+        );
         let exiscube = instance
             .controllables
             .iter()
@@ -68,7 +73,7 @@ impl<'a> SafetyGameSolver<'a> {
 
             fixpoint = safe_states.clone();
             safe_states.and_assign(&self.pre_system(safe_states.clone()));
-            if !self.instance.initial_condition.leq(&safe_states) {
+            if !(self.instance.initial_condition.leq(&safe_states)) {
                 // unrealizable
                 return None;
             }

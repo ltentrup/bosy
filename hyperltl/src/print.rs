@@ -40,7 +40,6 @@ impl std::fmt::Display for super::Op {
             Until => write!(f, "U"),
             Release => write!(f, "R"),
             WeakUntil => write!(f, "W"),
-            DualWeakUntil => write!(f, "M"),
             True => write!(f, "⊤"),
             False => write!(f, "⊥"),
         }

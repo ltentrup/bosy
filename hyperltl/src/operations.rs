@@ -98,10 +98,10 @@ impl HyperLTL {
     pub fn normalize(mut self) -> Self {
         self.check_arity();
         self.remove_derived();
-        self.to_nnf(false).flatten()
+        self.push_next().to_nnf(false).flatten()
     }
 
-    /// Removes all operators that do not have a dual operation, i.e., `Implication`
+    /// Removes all operators that do not have a dual operation, i.e., `Implication` and `WeakUntil`
     fn remove_derived(&mut self) {
         match self {
             Quant(kind, vars, scope) => scope.remove_derived(),
@@ -114,10 +114,47 @@ impl HyperLTL {
                         inner.insert(0, Appl(Negation, vec![lhs]));
                         *op = Disjunction;
                     }
+                    WeakUntil => {
+                        // equivelant to `G lhs || lhs U rhs`
+                        let lhs = inner[0].clone();
+                        let dummy = Appl(Op::True, vec![]);
+                        *op = Op::Until;
+                        let old = std::mem::replace(self, dummy);
+                        *self = Appl(Op::Disjunction, vec![Appl(Op::Globally, vec![lhs]), old])
+                    }
                     _ => {}
                 }
             }
             Prop(_, _) => {}
+        }
+    }
+
+    // pushes next operator over other temporal operators
+    fn push_next(self) -> Self {
+        match self {
+            Appl(Op::Next, mut inner) => {
+                let inner = inner.pop().unwrap();
+                match inner {
+                    Appl(Op::Globally, inner) => Appl(
+                        Op::Globally,
+                        inner
+                            .into_iter()
+                            .map(|subf| Appl(Op::Next, vec![subf]).push_next())
+                            .collect(),
+                    ),
+                    Appl(Op::Finally, inner) => Appl(
+                        Op::Finally,
+                        inner
+                            .into_iter()
+                            .map(|subf| Appl(Op::Next, vec![subf]).push_next())
+                            .collect(),
+                    ),
+                    t => Appl(Op::Next, vec![t]),
+                }
+            }
+            Appl(op, inner) => Appl(op, inner.into_iter().map(|subf| subf.push_next()).collect()),
+            Prop(_, _) => self,
+            _ => unreachable!(),
         }
     }
 
@@ -514,7 +551,6 @@ impl Op {
             Equivalence => Exclusion,
             Until => Release,
             Release => Until,
-            WeakUntil => DualWeakUntil,
             True => False,
             False => True,
             _ => unreachable!(),
@@ -577,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn test_removed_derived() {
+    fn test_removed_derived_implication() {
         let mut before = Appl(
             Implication,
             vec![Prop("a".into(), None), Prop("b".into(), None)],
@@ -587,6 +623,24 @@ mod tests {
             vec![
                 Appl(Negation, vec![Prop("a".into(), None)]),
                 Prop("b".into(), None),
+            ],
+        );
+        before.remove_derived();
+
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn test_removed_derived_weak_until() {
+        let mut before = Appl(
+            WeakUntil,
+            vec![Prop("a".into(), None), Prop("b".into(), None)],
+        );
+        let after = Appl(
+            Disjunction,
+            vec![
+                Appl(Globally, vec![Prop("a".into(), None)]),
+                Appl(Until, vec![Prop("a".into(), None), Prop("b".into(), None)]),
             ],
         );
         before.remove_derived();

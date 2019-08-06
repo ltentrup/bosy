@@ -55,8 +55,6 @@ pub enum Op {
     Release,
     /// The temporal operator `W` for the weak variant of until
     WeakUntil,
-    /// The dual of the weak until
-    DualWeakUntil,
     /// Literal `true`
     True,
     /// Literal `false`
@@ -80,7 +78,6 @@ impl Op {
             Until => Some(2),
             Release => Some(2),
             WeakUntil => Some(2),
-            DualWeakUntil => Some(2),
             True => Some(0),
             False => Some(0),
         }
@@ -101,7 +98,6 @@ impl Op {
             Until => false,
             Release => true,
             WeakUntil => true,
-            DualWeakUntil => false,
             True => true,
             False => true,
         }
@@ -122,10 +118,13 @@ impl Op {
             Until => false,
             Release => false,
             WeakUntil => false,
-            DualWeakUntil => false,
             True => true,
             False => true,
         }
+    }
+
+    fn is_temporal(&self) -> bool {
+        !self.is_propositional()
     }
 }
 

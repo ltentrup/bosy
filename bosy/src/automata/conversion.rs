@@ -34,11 +34,11 @@ impl LTL2Automaton {
 }
 
 impl CoBuchiAutomaton<smtlib::Term> {
-    fn from<'a>(neverclaim: &str, Props: impl Iterator<Item = String>) -> Result<Self, Box<Error>> {
+    fn from<'a>(neverclaim: &str, props: impl Iterator<Item = String>) -> Result<Self, Box<Error>> {
         let pairs = NeverClaimParser::parse(Rule::neverclaim, neverclaim)?;
 
         let mut instance = smtlib::Instance::new();
-        for prop in Props {
+        for prop in props {
             instance.declare_const(&prop, smtlib::Sort::BOOL);
         }
 
