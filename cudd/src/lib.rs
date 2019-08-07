@@ -112,7 +112,7 @@ impl<'a> CuddNode<'a> {
         assert!(result > 0);
     }
 
-    pub fn and_abstract(self, and: &CuddNode, cube: &CuddNode) -> Self {
+    pub fn and_abstract(&self, and: &CuddNode, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
         let result =
             unsafe { Cudd_bddAndAbstract(self.manager.ptr, self.node, and.node, cube.node) };
@@ -120,28 +120,28 @@ impl<'a> CuddNode<'a> {
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn exist_abstract(self, cube: &CuddNode) -> Self {
+    pub fn exist_abstract(&self, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
         let result = unsafe { Cudd_bddExistAbstract(self.manager.ptr, self.node, cube.node) };
         self.check_return_value(result);
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn univ_abstract(self, cube: &CuddNode) -> Self {
+    pub fn univ_abstract(&self, cube: &CuddNode) -> Self {
         assert_eq!(self.manager, cube.manager);
         let result = unsafe { Cudd_bddUnivAbstract(self.manager.ptr, self.node, cube.node) };
         self.check_return_value(result);
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn or(self, other: &CuddNode) -> Self {
+    pub fn or(&self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
         let result = unsafe { Cudd_bddOr(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn and(self, other: &CuddNode) -> Self {
+    pub fn and(&self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
         let result = unsafe { Cudd_bddAnd(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
@@ -155,7 +155,7 @@ impl<'a> CuddNode<'a> {
         *self = CuddNode::new(&self.manager, result)
     }
 
-    pub fn implies(self, other: &CuddNode) -> Self {
+    pub fn implies(&self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
         // !self || other
         let result = unsafe { Cudd_bddOr(self.manager.ptr, Cudd_Not(self.node), other.node) };
@@ -163,7 +163,7 @@ impl<'a> CuddNode<'a> {
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn xnor(self, other: &CuddNode) -> Self {
+    pub fn xnor(&self, other: &CuddNode) -> Self {
         assert_eq!(self.manager, other.manager);
         let result = unsafe { Cudd_bddXnor(self.manager.ptr, self.node, other.node) };
         self.check_return_value(result);
@@ -185,7 +185,7 @@ impl<'a> CuddNode<'a> {
         CuddNode::new(&self.manager, result)
     }
 
-    pub fn vector_compose(self, vector: &[CuddNode]) -> Self {
+    pub fn vector_compose(&self, vector: &[CuddNode]) -> Self {
         assert_eq!(vector.len(), unsafe { Cudd_ReadSize(self.manager.ptr) }
             as usize);
         let result = {
@@ -240,20 +240,32 @@ impl<'a> std::ops::Not for &CuddNode<'a> {
 impl<'a> std::ops::BitAnd for CuddNode<'a> {
     type Output = Self;
 
-    fn bitand(self, rhs: CuddNode) -> Self {
-        assert_eq!(self.manager, rhs.manager);
-        let result = unsafe { Cudd_bddAnd(self.manager.ptr, self.node, rhs.node) };
-        CuddNode::new(&self.manager, result)
+    fn bitand(self, rhs: Self) -> Self::Output {
+        self.and(&rhs)
+    }
+}
+
+impl<'a> std::ops::BitAnd for &CuddNode<'a> {
+    type Output = CuddNode<'a>;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        self.and(rhs)
     }
 }
 
 impl<'a> std::ops::BitOr for CuddNode<'a> {
     type Output = Self;
 
-    fn bitor(self, rhs: CuddNode) -> Self {
-        assert_eq!(self.manager, rhs.manager);
-        let result = unsafe { Cudd_bddOr(self.manager.ptr, self.node, rhs.node) };
-        CuddNode::new(&self.manager, result)
+    fn bitor(self, rhs: Self) -> Self {
+        self.or(&rhs)
+    }
+}
+
+impl<'a> std::ops::BitOr for &CuddNode<'a> {
+    type Output = CuddNode<'a>;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self.or(&rhs)
     }
 }
 

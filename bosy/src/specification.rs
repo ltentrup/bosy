@@ -146,6 +146,27 @@ impl Specification {
     pub fn outputs(&self) -> &[String] {
         &self.outputs
     }
+
+    pub fn negated(&self) -> Self {
+        assert!(self.hyper.is_none());
+        Self {
+            semantics: self.semantics.negated(),
+            inputs: self.outputs.clone(),
+            outputs: self.inputs.clone(),
+            assumptions: vec![],
+            guarantees: vec![HyperLTL::new_unary(Op::Negation, self.ltl())],
+            hyper: None,
+        }
+    }
+}
+
+impl Semantics {
+    fn negated(&self) -> Self {
+        match self {
+            Semantics::Mealy => Semantics::Moore,
+            Semantics::Moore => Semantics::Mealy,
+        }
+    }
 }
 
 #[cfg(test)]

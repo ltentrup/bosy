@@ -206,6 +206,18 @@ impl Term {
             _ => unimplemented!(),
         }
     }
+
+    pub fn is_false(&self) -> bool {
+        match &self.kind {
+            TermKind::Ident(ident) => {
+                match &ident.kind {
+                    IdentKind::BooleanFun(BoolFun::False) => true,
+                    _ => false,
+                }
+            },
+            _ => false
+        }
+    }
 }
 
 impl From<&Identifier> for Term {

@@ -22,11 +22,15 @@ impl LTL2Automaton {
         let output = Command::new("ltl2tgba")
             .env("PATH", "../external/bin:./external/bin")
             .arg("-f")
-            .arg(format!("{}", spec.to_spot()))
+            .arg(spec.to_spot())
             .arg("--spin")
             .arg("--low")
             .output()?;
         //println!("{:?}", output);
+        if !output.status.success() {
+            let stderr = String::from_utf8(output.stderr)?;
+            panic!("automaton construction failed:\n{}", stderr);
+        }
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout)?;
         CoBuchiAutomaton::from(&stdout, spec.get_occurrences().into_iter())

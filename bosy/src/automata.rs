@@ -1,10 +1,11 @@
 use crate::logic::Logic;
+use pathfinding::directed::strongly_connected_components::strongly_connected_components_from;
 use std::collections::HashMap;
 
 pub mod conversion;
 mod dot;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, Hash)]
 pub struct State<L: Logic> {
     pub id: StateId,
     pub name: Option<String>,
@@ -22,6 +23,12 @@ impl<L: Logic> State<L> {
             rejecting: false,
             safety: None,
         }
+    }
+}
+
+impl<L: Logic> std::cmp::PartialEq for State<L> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 
@@ -73,5 +80,16 @@ impl<L: Logic> CoBuchiAutomaton<L> {
         self.transitions[&state.id]
             .iter()
             .map(move |(&k, v)| (&self.states[k], v))
+    }
+
+    fn initial(&self) -> &State<L> {
+        self.states.iter().find(|s| s.initial).unwrap()
+    }
+
+    pub fn sccs(&self) -> Vec<Vec<&State<L>>> {
+        let successors = |s: &&State<L>| self.outgoing(s).filter(|(_,guard)| {
+            !guard.is_false()
+        }).map(|(s,_)| s);
+        strongly_connected_components_from(&self.initial(), successors)
     }
 }

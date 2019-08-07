@@ -17,6 +17,13 @@ impl<'a> SafetyGame<'a> {
 
         let partitioned = ltl.normalize().partition().unwrap();
 
+        if !partitioned.liveness_assumptions.is_empty()
+            || !partitioned.reccurrence_assumptions.is_empty()
+        {
+            //panic!("not applicable");
+            println!("detected liveness assumptions");
+        }
+
         info!("partitioned\n\n{}", partitioned);
 
         // build a safety game with a single livness counter of bound `bound`
@@ -96,7 +103,7 @@ impl<'a> SafetyGame<'a> {
             latch_names.extend(state_names);
             compose.extend(incoming);
             initial_condition.extend(initial_state);
-            env_safe.push(fair);
+            env_safe.extend(fair);
         }
         for safety_guarantee in &partitioned.safety_guarantees {
             let LivenessAutomatonEncoding {
@@ -118,7 +125,7 @@ impl<'a> SafetyGame<'a> {
             latch_names.extend(state_names);
             compose.extend(incoming);
             initial_condition.extend(initial_state);
-            sys_safe.push(fair);
+            sys_safe.extend(fair);
         }
 
         let mut sys_fair: Vec<CuddNode> = Vec::new();
@@ -145,7 +152,7 @@ impl<'a> SafetyGame<'a> {
             latch_names.extend(state_names);
             compose.extend(incoming);
             initial_condition.extend(initial_state);
-            env_fair.push(fair);
+            env_fair.extend(fair);
         }
         for liveness_guarantee in &partitioned.liveness_guarantees {
             let LivenessAutomatonEncoding {
@@ -184,14 +191,14 @@ impl<'a> SafetyGame<'a> {
             latch_names.extend(state_names);
             compose.extend(incoming);
             initial_condition.extend(initial_state);
-            sys_fair.push(fair);
+            sys_fair.extend(fair);
         }
 
         // (3) build constraints from LTL
 
         // (3.1) preset
         for preset_assumption in &partitioned.preset_assumptions {
-            env_safe.push(initial_node.clone().implies(&translate(
+            env_safe.push(initial_node.implies(&translate(
                 preset_assumption,
                 true,
                 manager,
@@ -203,7 +210,7 @@ impl<'a> SafetyGame<'a> {
             )));
         }
         for preset_guarantee in &partitioned.preset_guarantees {
-            sys_safe.push(initial_node.clone().implies(&translate(
+            sys_safe.push(initial_node.implies(&translate(
                 preset_guarantee,
                 true,
                 manager,
@@ -343,7 +350,7 @@ impl<'a> SafetyGame<'a> {
         let env_safe_err_happened = manager.new_var();
         latches.push(env_safe_err_happened.clone());
         latch_names.push(String::from("env_safe_err_happened"));
-        compose.push(env_safe_err_happened.clone().or(&env_safe_err.clone()));
+        compose.push(env_safe_err_happened.or(&env_safe_err.clone()));
         initial_condition.push(!env_safe_err_happened.clone());
 
         // we have to remember every sys_fair..
@@ -352,15 +359,13 @@ impl<'a> SafetyGame<'a> {
         let all_sys_fair_fulfilled = sys_fair_done
             .iter()
             .zip(&sys_fair)
-            .fold(manager.one(), |val, (done, fair)| {
-                val.and(&done.clone().or(&fair))
-            });
+            .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
 
         let progress_in_sys_fair = sys_fair_done
             .iter()
             .zip(&sys_fair)
             .fold(manager.zero(), |val, (done, fair)| {
-                val.or(&done.clone().not().and(&fair))
+                val.or(&done.not().and(&fair))
             });
 
         /*println!("<all_sys_fair_fulfilled>");
@@ -372,11 +377,11 @@ impl<'a> SafetyGame<'a> {
         println!("</progress_in_sys_fair>");
 
         println!("<!all_sys_fair_fulfilled>");
-        all_sys_fair_fulfilled.clone().not().print_minterms();
+        all_sys_fair_fulfilled.not().print_minterms();
         println!("</!all_sys_fair_fulfilled>");
 
         println!("<!all_sys_fair_fulfilled & !progress_in_sys_fair>");
-        (all_sys_fair_fulfilled.clone().not())
+        (all_sys_fair_fulfilled.not())
             .and(&!progress_in_sys_fair.clone())
             .print_minterms();
         println!("</!all_sys_fair_fulfilled & !progress_in_sys_fair>");*/
@@ -386,9 +391,7 @@ impl<'a> SafetyGame<'a> {
         let all_env_fair_fulfilled = env_fair_done
             .iter()
             .zip(&env_fair)
-            .fold(manager.one(), |val, (done, fair)| {
-                val.and(&done.clone().or(&fair))
-            });
+            .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
 
         /*println!("<all_env_fair_fulfilled>");
         all_env_fair_fulfilled.print_minterms();
@@ -405,7 +408,7 @@ impl<'a> SafetyGame<'a> {
                 (!all_sys_fair_fulfilled.clone())
                     .and(&!progress_in_sys_fair.clone())
                     .and(&!all_env_fair_fulfilled.clone())
-                    .and(&done.clone().or(fair))
+                    .and(&done.or(fair))
             })
             .collect();
 
@@ -422,7 +425,7 @@ impl<'a> SafetyGame<'a> {
             .map(|(done, fair)| {
                 all_sys_fair_fulfilled.ite(
                     &manager.zero(),
-                    &progress_in_sys_fair.ite(&(done.clone().or(fair)), done),
+                    &progress_in_sys_fair.ite(&(done.or(fair)), done),
                 )
             })
             .collect();
@@ -449,7 +452,7 @@ impl<'a> SafetyGame<'a> {
                                 (0..i)
                                     .map(|j| &counter_latches[j])
                                     .fold(manager.one(), |val, count| val.and(count))
-                                    .ite(&counter.clone().xor(&manager.one()), &counter)
+                                    .ite(&counter.xor(&manager.one()), &counter)
                             }),
                             &counter,
                         ),
@@ -537,7 +540,7 @@ impl<'a> SafetyGame<'a> {
     }
 }
 
-/// translates a guard given as smtlib::Term into BDD
+/// translates a guard given as `smtlib::Term` into BDD
 fn translate_guard<'a>(
     term: &smtlib::Term,
     manager: &'a CuddManager,
@@ -591,7 +594,7 @@ struct LivenessAutomatonEncoding<'a> {
     incoming: Vec<CuddNode<'a>>,
     state_names: Vec<String>,
     initial_state: Vec<CuddNode<'a>>,
-    fair: CuddNode<'a>,
+    fair: Vec<CuddNode<'a>>,
 }
 
 fn build_liveness_automaton<'a>(
@@ -614,7 +617,8 @@ fn build_liveness_automaton<'a>(
     let mut state_nodes: Vec<CuddNode> = Vec::new();
     let mut state_names: Vec<String> = Vec::new();
     let mut initial_state: Vec<CuddNode> = Vec::new();
-    let mut fair = manager.one();
+    let mut fair: Vec<CuddNode> = Vec::new();
+
     for state in automaton.states() {
         let node = manager.new_var();
         if state.initial {
@@ -622,12 +626,42 @@ fn build_liveness_automaton<'a>(
         } else {
             initial_state.push(node.clone().not());
         }
-        if state.rejecting {
-            fair = fair.and(&!node.clone());
-        }
+        /*if state.rejecting {
+            // only count real rejecting runs, i.e., self loops
+            let guard = automaton
+                .outgoing(state)
+                .filter(|(s, _)| s.id == state.id)
+                .map(|(_, guard)| guard)
+                .next()
+                .unwrap();
+            let translated_guard =
+                translate_guard(guard, manager, inputs, input_names, outputs, output_names);
+            fair.push(!(node.and(&translated_guard)));
+        }*/
         state_nodes.push(node);
         state_names.push(state.name.as_ref().unwrap().clone());
     }
+
+    // rejecting states
+    for scc in &automaton.sccs() {
+        if !scc.iter().any(|s| s.rejecting) {
+            // no rejecting state in SCC
+            continue;
+        }
+        let mut condition = manager.zero();
+        for state in scc.iter().filter(|s| s.rejecting) {
+            let node = &state_nodes[state.id];
+            // only count real rejecting runs, i.e., self loops
+            let forbidden = automaton
+                .outgoing(state)
+                .filter(|(s, _)| scc.contains(s) && s.rejecting)
+                .map(|(_, guard)| translate_guard(guard, manager, inputs, input_names, outputs, output_names))
+                .fold(manager.one(), |val, guard| val.and(&guard));
+            condition = condition.or(&!(node.and(&forbidden)));
+        }
+        fair.push(condition);
+    }
+
     // build transition function
     let mut incoming: Vec<CuddNode> = state_nodes.iter().map(|_| manager.zero()).collect();
     for state in automaton.states() {
@@ -952,6 +986,28 @@ mod tests {
         "G (g_0 <-> r_0)",
         "GF g_0"
     ]
+}
+        "#,
+        )
+        .expect("Specification is not valid");
+        assert!(spec.check().is_ok());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_some());
+    }
+
+    #[test]
+    fn test_rejecting_self_loop() {
+        let spec: Specification = serde_json::from_str(
+            r#"
+{
+    "semantics": "mealy",
+    "inputs": ["p_0", "p_1", "p_2", "p_3"],
+    "outputs": ["acc"],
+    "assumptions": [],
+    "guarantees": ["G (F p_0 && F p_1) <-> GF acc"]
 }
         "#,
         )

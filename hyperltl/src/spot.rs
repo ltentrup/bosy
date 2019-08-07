@@ -13,7 +13,11 @@ impl HyperLTL {
                 }
                 match inner.len() {
                     0 => format!("{}", op),
-                    1 => format!("{}{}", op, inner.iter().next().unwrap()),
+                    1 => format!(
+                        "{}{}",
+                        op,
+                        inner.iter().map(|inner| inner.to_spot()).next().unwrap()
+                    ),
                     _ => {
                         let operands: Vec<String> = inner.iter().map(|ele| ele.to_spot()).collect();
                         format!("({})", operands.join(&format!("{}", op)))
