@@ -209,14 +209,26 @@ impl Term {
 
     pub fn is_false(&self) -> bool {
         match &self.kind {
-            TermKind::Ident(ident) => {
-                match &ident.kind {
-                    IdentKind::BooleanFun(BoolFun::False) => true,
-                    _ => false,
-                }
+            TermKind::Ident(ident) => match &ident.kind {
+                IdentKind::BooleanFun(BoolFun::False) => true,
+                _ => false,
             },
-            _ => false
+            _ => false,
         }
+    }
+
+    pub fn is_true(&self) -> bool {
+        match &self.kind {
+            TermKind::Ident(ident) => match &ident.kind {
+                IdentKind::BooleanFun(BoolFun::True) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    pub fn negated(&self) -> Self {
+        Term::new_appl(Identifier::NOT, vec![self.clone()])
     }
 }
 
@@ -425,7 +437,7 @@ mod tests {
         let script = format!("{}", instance);
         assert_eq!(
             script,
-            "(declare-const a Bool)\n(declare-const b Bool)\n(assert (and a b )\n\t)\n"
+            "(declare-const a Bool)\n(declare-const b Bool)\n(assert (and a b ))\n"
         )
     }
 }

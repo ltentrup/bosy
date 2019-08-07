@@ -45,7 +45,7 @@ impl<'a> BoSyEncoding<'a> {
             "S",
             &(0..bound)
                 .into_iter()
-                .map(|(i)| format!("s_{}", i))
+                .map(|i| format!("s_{}", i))
                 .collect::<Vec<String>>(),
         );
         //let initial = constraints.declare_const("s_0", &states);

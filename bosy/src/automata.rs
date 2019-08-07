@@ -4,8 +4,9 @@ use std::collections::HashMap;
 
 pub mod conversion;
 mod dot;
+pub mod reduction;
 
-#[derive(Debug, Eq, Hash)]
+#[derive(Debug, Eq, Hash, Clone)]
 pub struct State<L: Logic> {
     pub id: StateId,
     pub name: Option<String>,
@@ -87,9 +88,98 @@ impl<L: Logic> CoBuchiAutomaton<L> {
     }
 
     pub fn sccs(&self) -> Vec<Vec<&State<L>>> {
-        let successors = |s: &&State<L>| self.outgoing(s).filter(|(_,guard)| {
-            !guard.is_false()
-        }).map(|(s,_)| s);
+        let successors = |s: &&State<L>| {
+            self.outgoing(s)
+                .filter(|(_, guard)| !guard.is_false())
+                .map(|(s, _)| s)
+        };
         strongly_connected_components_from(&self.initial(), successors)
+    }
+
+    pub fn remove_rejecting_sinks(&mut self) {
+        let rejecting_sink = match self
+            .states()
+            .iter()
+            .filter(|s| {
+                if !s.rejecting {
+                    return false;
+                }
+                let mut outgoing = self.outgoing(s);
+                if let Some((succ, guard)) = outgoing.next() {
+                    if outgoing.next().is_some() {
+                        return false;
+                    }
+                    if succ != *s {
+                        return false;
+                    }
+                    if !guard.is_true() {
+                        return false;
+                    }
+                    true
+                } else {
+                    false
+                }
+            })
+            .map(|s| s.id)
+            .next()
+        {
+            Some(sink) => sink,
+            None => return,
+        };
+        //println!("sink {}", rejecting_sink);
+
+        // remove edges to rejecting state
+
+        let transitions = &mut self.transitions;
+        let states = &mut self.states;
+
+        transitions.retain(|&source, outgoing| {
+            if source == rejecting_sink {
+                return false;
+            }
+            outgoing.retain(|&target, guard| {
+                if target != rejecting_sink {
+                    return true;
+                }
+                states[source].safety = Some(guard.negated());
+                false
+            });
+            true
+        });
+
+        // remove rejecting sink from states
+        states.remove(rejecting_sink);
+
+        // rename states
+        states.iter_mut().for_each(|state| {
+            if state.id > rejecting_sink {
+                state.id -= 1;
+            }
+        });
+
+        let old = std::mem::replace(&mut self.transitions, HashMap::new());
+
+        self.transitions = old
+            .into_iter()
+            .map(|(source, outgoing)| {
+                let new_source = if source > rejecting_sink {
+                    source - 1
+                } else {
+                    source
+                };
+                let new_outgoing = outgoing
+                    .into_iter()
+                    .map(|(target, guard)| {
+                        let new_target = if target > rejecting_sink {
+                            target - 1
+                        } else {
+                            target
+                        };
+                        (new_target, guard)
+                    })
+                    .collect();
+                (new_source, new_outgoing)
+            })
+            .collect();
     }
 }

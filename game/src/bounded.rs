@@ -6,9 +6,20 @@ use hyperltl::{HyperLTL, Op};
 use log::info;
 use std::ops::Not;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum ReductionMethod {
+    SingleCounter,
+    Unrolling,
+}
+
 impl<'a> SafetyGame<'a> {
     #[allow(clippy::cognitive_complexity)]
-    pub fn from_bosy(spec: &Specification, manager: &'a CuddManager, bound: u32) -> Self {
+    pub(crate) fn from_bosy(
+        spec: &Specification,
+        manager: &'a CuddManager,
+        bound: u32,
+        method: ReductionMethod,
+    ) -> Self {
         info!("Build safety game from BoSy spec with bound {}", bound);
         assert!(spec.hyper().is_none());
 
@@ -82,119 +93,7 @@ impl<'a> SafetyGame<'a> {
         let mut env_safe: Vec<CuddNode> = Vec::new();
         let mut sys_safe: Vec<CuddNode> = Vec::new();
 
-        // (2.2) safety automata
-        for safety_assumption in &partitioned.safety_assumptions {
-            let LivenessAutomatonEncoding {
-                state_nodes,
-                incoming,
-                state_names,
-                initial_state,
-                fair,
-            } = build_liveness_automaton(
-                safety_assumption,
-                &manager,
-                &uncontrollables,
-                &uncontrollable_names,
-                &controllables,
-                &controllable_names,
-            );
-
-            latches.extend(state_nodes);
-            latch_names.extend(state_names);
-            compose.extend(incoming);
-            initial_condition.extend(initial_state);
-            env_safe.extend(fair);
-        }
-        for safety_guarantee in &partitioned.safety_guarantees {
-            let LivenessAutomatonEncoding {
-                state_nodes,
-                incoming,
-                state_names,
-                initial_state,
-                fair,
-            } = build_liveness_automaton(
-                safety_guarantee,
-                &manager,
-                &uncontrollables,
-                &uncontrollable_names,
-                &controllables,
-                &controllable_names,
-            );
-
-            latches.extend(state_nodes);
-            latch_names.extend(state_names);
-            compose.extend(incoming);
-            initial_condition.extend(initial_state);
-            sys_safe.extend(fair);
-        }
-
-        let mut sys_fair: Vec<CuddNode> = Vec::new();
-        let mut env_fair: Vec<CuddNode> = Vec::new();
-
-        // (2.3) liveness automata
-        for liveness_assumption in &partitioned.liveness_assumptions {
-            let LivenessAutomatonEncoding {
-                state_nodes,
-                incoming,
-                state_names,
-                initial_state,
-                fair,
-            } = build_liveness_automaton(
-                liveness_assumption,
-                &manager,
-                &uncontrollables,
-                &uncontrollable_names,
-                &controllables,
-                &controllable_names,
-            );
-
-            latches.extend(state_nodes);
-            latch_names.extend(state_names);
-            compose.extend(incoming);
-            initial_condition.extend(initial_state);
-            env_fair.extend(fair);
-        }
-        for liveness_guarantee in &partitioned.liveness_guarantees {
-            let LivenessAutomatonEncoding {
-                state_nodes,
-                incoming,
-                state_names,
-                initial_state,
-                fair,
-            } = build_liveness_automaton(
-                liveness_guarantee,
-                &manager,
-                &uncontrollables,
-                &uncontrollable_names,
-                &controllables,
-                &controllable_names,
-            );
-
-            /*incoming.iter().enumerate().for_each(|(i, s)| {
-                println!("<incoming {}>", i);
-                s.print_minterms();
-                assert_ne!(s, &manager.zero());
-                println!("</incoming {}>", i);
-            });
-            initial_state.iter().enumerate().for_each(|(i, s)| {
-                println!("<initial {}>", i);
-                s.print_minterms();
-                assert_ne!(s, &manager.zero());
-                println!("</initial {}>", i);
-            });
-
-            println!("<sys_fair>");
-            fair.print_minterms();
-            println!("</sys_fair>");*/
-
-            latches.extend(state_nodes);
-            latch_names.extend(state_names);
-            compose.extend(incoming);
-            initial_condition.extend(initial_state);
-            sys_fair.extend(fair);
-        }
-
-        // (3) build constraints from LTL
+        // (3) build safety constraints from safety LTL part
 
         // (3.1) preset
         for preset_assumption in &partitioned.preset_assumptions {
@@ -290,48 +189,229 @@ impl<'a> SafetyGame<'a> {
             }
         }
 
-        // (3.4) reccurrence
-        for reccurrence_assumption in &partitioned.reccurrence_assumptions {
-            if let HyperLTL::Appl(Op::Globally, inner) = &reccurrence_assumption {
-                if let HyperLTL::Appl(Op::Finally, inner) = &inner[0] {
-                    env_fair.push(translate(
-                        &inner[0],
-                        false,
-                        manager,
-                        &uncontrollables,
-                        &uncontrollable_names,
-                        &controllables,
-                        &controllable_names,
-                        &latches,
-                    ));
-                /*println!("<env_fair>");
-                env_fair.last().unwrap().print_minterms();
-                println!("</env_fair>");*/
-                } else {
-                    panic!("{} not an reccurrence", reccurrence_assumption);
-                }
-            } else {
-                panic!("{} not an reccurrence", reccurrence_assumption);
-            }
+        // (3.4) safety automata
+        for safety_assumption in &partitioned.safety_assumptions {
+            let LivenessAutomatonEncoding {
+                state_nodes,
+                incoming,
+                state_names,
+                initial_state,
+                fair,
+                safe,
+            } = build_liveness_automaton(
+                safety_assumption,
+                &manager,
+                &uncontrollables,
+                &uncontrollable_names,
+                &controllables,
+                &controllable_names,
+            );
+            assert!(fair.is_empty());
+
+            latches.extend(state_nodes);
+            latch_names.extend(state_names);
+            compose.extend(incoming);
+            initial_condition.extend(initial_state);
+            env_safe.extend(safe);
         }
-        for reccurrence_guarantee in &partitioned.reccurrence_guarantees {
-            if let HyperLTL::Appl(Op::Globally, inner) = &reccurrence_guarantee {
-                if let HyperLTL::Appl(Op::Finally, inner) = &inner[0] {
-                    sys_fair.push(translate(
-                        &inner[0],
-                        false,
-                        manager,
+        for safety_guarantee in &partitioned.safety_guarantees {
+            let LivenessAutomatonEncoding {
+                state_nodes,
+                incoming,
+                state_names,
+                initial_state,
+                fair,
+                safe,
+            } = build_liveness_automaton(
+                safety_guarantee,
+                &manager,
+                &uncontrollables,
+                &uncontrollable_names,
+                &controllables,
+                &controllable_names,
+            );
+            assert!(fair.is_empty());
+
+            latches.extend(state_nodes);
+            latch_names.extend(state_names);
+            compose.extend(incoming);
+            initial_condition.extend(initial_state);
+            sys_safe.extend(safe);
+        }
+
+        // (4) build constrainst from liveness LTL part
+
+        let mut sys_fair: Vec<CuddNode> = Vec::new();
+        let mut env_fair: Vec<CuddNode> = Vec::new();
+
+        match method {
+            ReductionMethod::SingleCounter => {
+                // (4.1) reccurrence
+                for reccurrence_assumption in &partitioned.reccurrence_assumptions {
+                    if let HyperLTL::Appl(Op::Globally, inner) = &reccurrence_assumption {
+                        if let HyperLTL::Appl(Op::Finally, inner) = &inner[0] {
+                            env_fair.push(translate(
+                                &inner[0],
+                                false,
+                                manager,
+                                &uncontrollables,
+                                &uncontrollable_names,
+                                &controllables,
+                                &controllable_names,
+                                &latches,
+                            ));
+                        /*println!("<env_fair>");
+                        env_fair.last().unwrap().print_minterms();
+                        println!("</env_fair>");*/
+                        } else {
+                            panic!("{} not an reccurrence", reccurrence_assumption);
+                        }
+                    } else {
+                        panic!("{} not an reccurrence", reccurrence_assumption);
+                    }
+                }
+                for reccurrence_guarantee in &partitioned.reccurrence_guarantees {
+                    if let HyperLTL::Appl(Op::Globally, inner) = &reccurrence_guarantee {
+                        if let HyperLTL::Appl(Op::Finally, inner) = &inner[0] {
+                            sys_fair.push(translate(
+                                &inner[0],
+                                false,
+                                manager,
+                                &uncontrollables,
+                                &uncontrollable_names,
+                                &controllables,
+                                &controllable_names,
+                                &latches,
+                            ));
+                        } else {
+                            panic!("{} not an reccurrence", reccurrence_guarantee);
+                        }
+                    } else {
+                        panic!("{} not an reccurrence", reccurrence_guarantee);
+                    }
+                }
+
+                // (4.2) liveness automata
+                for liveness_assumption in &partitioned.liveness_assumptions {
+                    let LivenessAutomatonEncoding {
+                        state_nodes,
+                        incoming,
+                        state_names,
+                        initial_state,
+                        fair,
+                        safe,
+                    } = build_liveness_automaton(
+                        liveness_assumption,
+                        &manager,
                         &uncontrollables,
                         &uncontrollable_names,
                         &controllables,
                         &controllable_names,
-                        &latches,
-                    ));
-                } else {
-                    panic!("{} not an reccurrence", reccurrence_guarantee);
+                    );
+
+                    latches.extend(state_nodes);
+                    latch_names.extend(state_names);
+                    compose.extend(incoming);
+                    initial_condition.extend(initial_state);
+                    env_fair.extend(fair);
+                    env_safe.extend(safe);
                 }
-            } else {
-                panic!("{} not an reccurrence", reccurrence_guarantee);
+                for liveness_guarantee in &partitioned.liveness_guarantees {
+                    let LivenessAutomatonEncoding {
+                        state_nodes,
+                        incoming,
+                        state_names,
+                        initial_state,
+                        fair,
+                        safe,
+                    } = build_liveness_automaton(
+                        liveness_guarantee,
+                        &manager,
+                        &uncontrollables,
+                        &uncontrollable_names,
+                        &controllables,
+                        &controllable_names,
+                    );
+
+                    /*incoming.iter().enumerate().for_each(|(i, s)| {
+                        println!("<incoming {}>", i);
+                        s.print_minterms();
+                        assert_ne!(s, &manager.zero());
+                        println!("</incoming {}>", i);
+                    });
+                    initial_state.iter().enumerate().for_each(|(i, s)| {
+                        println!("<initial {}>", i);
+                        s.print_minterms();
+                        assert_ne!(s, &manager.zero());
+                        println!("</initial {}>", i);
+                    });
+
+                    println!("<sys_fair>");
+                    fair.print_minterms();
+                    println!("</sys_fair>");*/
+
+                    latches.extend(state_nodes);
+                    latch_names.extend(state_names);
+                    compose.extend(incoming);
+                    initial_condition.extend(initial_state);
+                    sys_fair.extend(fair);
+                    sys_safe.extend(safe);
+                }
+            }
+            ReductionMethod::Unrolling => {
+                // build a single LTL formula
+                let assumptions = partitioned
+                    .reccurrence_assumptions
+                    .iter()
+                    .chain(&partitioned.liveness_assumptions)
+                    .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
+                        HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
+                    })
+                    .normalize();
+                let guarantees = [HyperLTL::new_unary(
+                    Op::Globally,
+                    HyperLTL::Prop("safe_g".to_string(), None),
+                )]
+                .iter()
+                .chain(&partitioned.reccurrence_guarantees)
+                .chain(&partitioned.liveness_guarantees)
+                .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
+                    HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
+                })
+                .normalize();
+
+                // TODO: partition if no assumptions
+
+                let ltl = HyperLTL::new_binary(Op::Implication, assumptions, guarantees);
+                let sys_safe_so_far = sys_safe
+                    .iter()
+                    .fold(manager.one(), |val, safe| val.and(safe));
+                println!("{}", ltl);
+
+                let LivenessAutomatonEncoding {
+                    state_nodes,
+                    incoming,
+                    state_names,
+                    initial_state,
+                    fair,
+                    safe,
+                } = build_unrolled_automaton(
+                    &ltl,
+                    &manager,
+                    sys_safe_so_far,
+                    bound,
+                    &uncontrollables,
+                    &uncontrollable_names,
+                    &controllables,
+                    &controllable_names,
+                );
+                assert!(fair.is_empty());
+
+                latches.extend(state_nodes);
+                latch_names.extend(state_names);
+                compose.extend(incoming);
+                initial_condition.extend(initial_state);
+                sys_safe.extend(safe);
             }
         }
 
@@ -353,160 +433,173 @@ impl<'a> SafetyGame<'a> {
         compose.push(env_safe_err_happened.or(&env_safe_err.clone()));
         initial_condition.push(!env_safe_err_happened.clone());
 
-        // we have to remember every sys_fair..
-        let sys_fair_done: Vec<CuddNode> = sys_fair.iter().map(|_| manager.new_var()).collect();
+        let safety_condition: CuddNode;
 
-        let all_sys_fair_fulfilled = sys_fair_done
-            .iter()
-            .zip(&sys_fair)
-            .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
+        match method {
+            ReductionMethod::SingleCounter => {
+                // we have to remember every sys_fair..
+                let sys_fair_done: Vec<CuddNode> =
+                    sys_fair.iter().map(|_| manager.new_var()).collect();
 
-        let progress_in_sys_fair = sys_fair_done
-            .iter()
-            .zip(&sys_fair)
-            .fold(manager.zero(), |val, (done, fair)| {
-                val.or(&done.not().and(&fair))
-            });
+                let all_sys_fair_fulfilled = sys_fair_done
+                    .iter()
+                    .zip(&sys_fair)
+                    .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
 
-        /*println!("<all_sys_fair_fulfilled>");
-        all_sys_fair_fulfilled.print_minterms();
-        println!("</all_sys_fair_fulfilled>");
+                let progress_in_sys_fair = sys_fair_done
+                    .iter()
+                    .zip(&sys_fair)
+                    .fold(manager.zero(), |val, (done, fair)| {
+                        val.or(&done.not().and(&fair))
+                    });
 
-        println!("<progress_in_sys_fair>");
-        progress_in_sys_fair.print_minterms();
-        println!("</progress_in_sys_fair>");
+                /*println!("<all_sys_fair_fulfilled>");
+                all_sys_fair_fulfilled.print_minterms();
+                println!("</all_sys_fair_fulfilled>");
 
-        println!("<!all_sys_fair_fulfilled>");
-        all_sys_fair_fulfilled.not().print_minterms();
-        println!("</!all_sys_fair_fulfilled>");
+                println!("<progress_in_sys_fair>");
+                progress_in_sys_fair.print_minterms();
+                println!("</progress_in_sys_fair>");
 
-        println!("<!all_sys_fair_fulfilled & !progress_in_sys_fair>");
-        (all_sys_fair_fulfilled.not())
-            .and(&!progress_in_sys_fair.clone())
-            .print_minterms();
-        println!("</!all_sys_fair_fulfilled & !progress_in_sys_fair>");*/
+                println!("<!all_sys_fair_fulfilled>");
+                all_sys_fair_fulfilled.not().print_minterms();
+                println!("</!all_sys_fair_fulfilled>");
 
-        // ..and env_fair
-        let env_fair_done: Vec<CuddNode> = env_fair.iter().map(|_| manager.new_var()).collect();
-        let all_env_fair_fulfilled = env_fair_done
-            .iter()
-            .zip(&env_fair)
-            .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
-
-        /*println!("<all_env_fair_fulfilled>");
-        all_env_fair_fulfilled.print_minterms();
-        println!("</all_env_fair_fulfilled>");*/
-
-        // build counter constraint, initial zero
-        let counter_latches: Vec<CuddNode> = (0..bound).map(|_| manager.new_var()).collect();
-        initial_condition.extend(counter_latches.iter().map(|n| !n));
-
-        let env_fair_done_compose: Vec<CuddNode> = env_fair_done
-            .iter()
-            .zip(&env_fair)
-            .map(|(done, fair)| {
-                (!all_sys_fair_fulfilled.clone())
+                println!("<!all_sys_fair_fulfilled & !progress_in_sys_fair>");
+                (all_sys_fair_fulfilled.not())
                     .and(&!progress_in_sys_fair.clone())
-                    .and(&!all_env_fair_fulfilled.clone())
-                    .and(&done.or(fair))
-            })
-            .collect();
+                    .print_minterms();
+                println!("</!all_sys_fair_fulfilled & !progress_in_sys_fair>");*/
 
-        /*for c in &env_fair_done_compose {
-            println!("<env_fair_done_compose>");
-            c.print_minterms();
-            //assert_ne!(c, &manager.zero());
-            println!("</env_fair_done_compose>");
-        }*/
+                // ..and env_fair
+                let env_fair_done: Vec<CuddNode> =
+                    env_fair.iter().map(|_| manager.new_var()).collect();
+                let all_env_fair_fulfilled = env_fair_done
+                    .iter()
+                    .zip(&env_fair)
+                    .fold(manager.one(), |val, (done, fair)| val.and(&done.or(&fair)));
 
-        let sys_fair_done_compose: Vec<CuddNode> = sys_fair_done
-            .iter()
-            .zip(&sys_fair)
-            .map(|(done, fair)| {
-                all_sys_fair_fulfilled.ite(
-                    &manager.zero(),
-                    &progress_in_sys_fair.ite(&(done.or(fair)), done),
-                )
-            })
-            .collect();
+                /*println!("<all_env_fair_fulfilled>");
+                all_env_fair_fulfilled.print_minterms();
+                println!("</all_env_fair_fulfilled>");*/
 
-        /*for c in &sys_fair_done_compose {
-            println!("<sys_fair_done_compose>");
-            c.print_minterms();
-            //assert_ne!(c, &manager.zero());
-            println!("</sys_fair_done_compose>");
-        }*/
+                // build counter constraint, initial zero
+                let counter_latches: Vec<CuddNode> =
+                    (0..bound).map(|_| manager.new_var()).collect();
+                initial_condition.extend(counter_latches.iter().map(|n| !n));
 
-        let counter_compose: Vec<CuddNode> = counter_latches
-            .iter()
-            .enumerate()
-            .map(|(i, counter)| {
-                all_sys_fair_fulfilled.ite(
-                    &manager.zero(),
-                    &progress_in_sys_fair.ite(
-                        &manager.zero(),
-                        &all_env_fair_fulfilled.ite(
-                            &(if i == 0 {
-                                counter.xor(&manager.one())
-                            } else {
-                                (0..i)
-                                    .map(|j| &counter_latches[j])
-                                    .fold(manager.one(), |val, count| val.and(count))
-                                    .ite(&counter.xor(&manager.one()), &counter)
-                            }),
-                            &counter,
-                        ),
-                    ),
-                )
-            })
-            .collect();
+                let env_fair_done_compose: Vec<CuddNode> = env_fair_done
+                    .iter()
+                    .zip(&env_fair)
+                    .map(|(done, fair)| {
+                        (!all_sys_fair_fulfilled.clone())
+                            .and(&!progress_in_sys_fair.clone())
+                            .and(&!all_env_fair_fulfilled.clone())
+                            .and(&done.or(fair))
+                    })
+                    .collect();
 
-        /*for c in &counter_compose {
-            println!("<counter_compose>");
-            c.print_minterms();
-            //assert_ne!(c, &manager.zero());
-            println!("</counter_compose>");
-        }*/
+                /*for c in &env_fair_done_compose {
+                    println!("<env_fair_done_compose>");
+                    c.print_minterms();
+                    //assert_ne!(c, &manager.zero());
+                    println!("</env_fair_done_compose>");
+                }*/
 
-        // add latches for sys_fair_done and env_fair_done
-        initial_condition.extend(sys_fair_done.iter().map(|n| !n));
-        latch_names.extend(
-            sys_fair_done
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!("sys_fair_{}", i)),
-        );
-        latches.extend(sys_fair_done);
-        compose.extend(sys_fair_done_compose);
+                let sys_fair_done_compose: Vec<CuddNode> = sys_fair_done
+                    .iter()
+                    .zip(&sys_fair)
+                    .map(|(done, fair)| {
+                        all_sys_fair_fulfilled.ite(
+                            &manager.zero(),
+                            &progress_in_sys_fair.ite(&(done.or(fair)), done),
+                        )
+                    })
+                    .collect();
 
-        initial_condition.extend(env_fair_done.iter().map(|n| !n));
-        latch_names.extend(
-            env_fair_done
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!("env_fair_{}", i)),
-        );
-        latches.extend(env_fair_done);
-        compose.extend(env_fair_done_compose);
+                /*for c in &sys_fair_done_compose {
+                    println!("<sys_fair_done_compose>");
+                    c.print_minterms();
+                    //assert_ne!(c, &manager.zero());
+                    println!("</sys_fair_done_compose>");
+                }*/
 
-        // add counter latches
-        latches.extend(counter_latches.clone());
-        latch_names.extend((0..bound).map(|i| format!("counter_{}", i)));
-        compose.extend(counter_compose);
+                let counter_compose: Vec<CuddNode> = counter_latches
+                    .iter()
+                    .enumerate()
+                    .map(|(i, counter)| {
+                        all_sys_fair_fulfilled.ite(
+                            &manager.zero(),
+                            &progress_in_sys_fair.ite(
+                                &manager.zero(),
+                                &all_env_fair_fulfilled.ite(
+                                    &(if i == 0 {
+                                        counter.xor(&manager.one())
+                                    } else {
+                                        (0..i)
+                                            .map(|j| &counter_latches[j])
+                                            .fold(manager.one(), |val, count| val.and(count))
+                                            .ite(&counter.xor(&manager.one()), &counter)
+                                    }),
+                                    &counter,
+                                ),
+                            ),
+                        )
+                    })
+                    .collect();
 
-        let fair_err = counter_latches
-            .iter()
-            .fold(manager.one(), |val, bit| val.and(bit));
+                /*for c in &counter_compose {
+                    println!("<counter_compose>");
+                    c.print_minterms();
+                    //assert_ne!(c, &manager.zero());
+                    println!("</counter_compose>");
+                }*/
 
-        /*println!("<fair_err>");
-        fair_err.print_minterms();
-        println!("</fair_err>");*/
+                // add latches for sys_fair_done and env_fair_done
+                initial_condition.extend(sys_fair_done.iter().map(|n| !n));
+                latch_names.extend(
+                    sys_fair_done
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| format!("sys_fair_{}", i)),
+                );
+                latches.extend(sys_fair_done);
+                compose.extend(sys_fair_done_compose);
 
-        // build safety condition
-        let safety_condition = (!env_safe_err)
-            .and(&!env_safe_err_happened)
-            .implies(&(!sys_safe_err).and(&!fair_err));
-        //assign o_err = ~env_safe_err & ~env_safe_err_happened & (sys_safe_err | fair_err);
+                initial_condition.extend(env_fair_done.iter().map(|n| !n));
+                latch_names.extend(
+                    env_fair_done
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| format!("env_fair_{}", i)),
+                );
+                latches.extend(env_fair_done);
+                compose.extend(env_fair_done_compose);
+
+                // add counter latches
+                latches.extend(counter_latches.clone());
+                latch_names.extend((0..bound).map(|i| format!("counter_{}", i)));
+                compose.extend(counter_compose);
+
+                let fair_err = counter_latches
+                    .iter()
+                    .fold(manager.one(), |val, bit| val.and(bit));
+
+                /*println!("<fair_err>");
+                fair_err.print_minterms();
+                println!("</fair_err>");*/
+
+                // build safety condition
+                safety_condition = (!env_safe_err)
+                    .and(&!env_safe_err_happened)
+                    .implies(&(!sys_safe_err).and(&!fair_err));
+            }
+            ReductionMethod::Unrolling => {
+                safety_condition = (!env_safe_err)
+                    .and(&!env_safe_err_happened)
+                    .implies(&!sys_safe_err);
+            }
+        }
 
         //println!("<safety_condition>");
         //safety_condition.print_minterms();
@@ -595,6 +688,7 @@ struct LivenessAutomatonEncoding<'a> {
     state_names: Vec<String>,
     initial_state: Vec<CuddNode<'a>>,
     fair: Vec<CuddNode<'a>>,
+    safe: Vec<CuddNode<'a>>,
 }
 
 fn build_liveness_automaton<'a>(
@@ -614,10 +708,14 @@ fn build_liveness_automaton<'a>(
             }
             Ok(automaton) => automaton,
         };
+
+    //automaton.print_dot();
+
     let mut state_nodes: Vec<CuddNode> = Vec::new();
     let mut state_names: Vec<String> = Vec::new();
     let mut initial_state: Vec<CuddNode> = Vec::new();
     let mut fair: Vec<CuddNode> = Vec::new();
+    let mut safe: Vec<CuddNode> = Vec::new();
 
     for state in automaton.states() {
         let node = manager.new_var();
@@ -638,6 +736,17 @@ fn build_liveness_automaton<'a>(
                 translate_guard(guard, manager, inputs, input_names, outputs, output_names);
             fair.push(!(node.and(&translated_guard)));
         }*/
+        if let Some(safety_cond) = &state.safety {
+            let safety_cond = translate_guard(
+                &safety_cond,
+                manager,
+                inputs,
+                input_names,
+                outputs,
+                output_names,
+            );
+            safe.push(node.implies(&safety_cond));
+        }
         state_nodes.push(node);
         state_names.push(state.name.as_ref().unwrap().clone());
     }
@@ -648,16 +757,17 @@ fn build_liveness_automaton<'a>(
             // no rejecting state in SCC
             continue;
         }
-        let mut condition = manager.zero();
-        for state in scc.iter().filter(|s| s.rejecting) {
+        let mut condition = manager.one();
+        for state in scc.iter() {
             let node = &state_nodes[state.id];
-            // only count real rejecting runs, i.e., self loops
-            let forbidden = automaton
-                .outgoing(state)
-                .filter(|(s, _)| scc.contains(s) && s.rejecting)
-                .map(|(_, guard)| translate_guard(guard, manager, inputs, input_names, outputs, output_names))
-                .fold(manager.one(), |val, guard| val.and(&guard));
-            condition = condition.or(&!(node.and(&forbidden)));
+            let stays = automaton
+                .outgoing(&state)
+                .filter(|(s, _)| scc.contains(s) && s == state)
+                .map(|(_, guard)| {
+                    translate_guard(guard, manager, inputs, input_names, outputs, output_names)
+                })
+                .fold(manager.zero(), |val, guard| val.or(&guard));
+            condition = condition.and(&node.implies(&!stays));
         }
         fair.push(condition);
     }
@@ -680,6 +790,89 @@ fn build_liveness_automaton<'a>(
         state_names,
         initial_state,
         fair,
+        safe,
+    }
+}
+
+fn build_unrolled_automaton<'a>(
+    ltl: &HyperLTL,
+    manager: &'a CuddManager,
+    safe_sys: CuddNode<'a>,
+    bound: u32,
+    inputs: &[CuddNode<'a>],
+    input_names: &[String],
+    outputs: &[CuddNode<'a>],
+    output_names: &[String],
+) -> LivenessAutomatonEncoding<'a> {
+    let mut outputs: Vec<CuddNode<'a>> = Vec::from(outputs);
+    outputs.push(safe_sys);
+    let mut output_names: Vec<String> = Vec::from(output_names);
+    output_names.push("safe_g".to_string());
+
+    let automaton =
+        match LTL2Automaton::Spot.to_ucw(&HyperLTL::new_unary(Op::Negation, ltl.clone())) {
+            Err(err) => {
+                eprintln!("failed to convert LTL to automaton");
+                eprintln!("{}", err);
+                panic!();
+            }
+            Ok(automaton) => automaton,
+        };
+
+    //automaton.print_dot();
+
+    let automaton = automaton.reduce_to_safety(bound);
+
+    //automaton.print_dot();
+
+    let mut state_nodes: Vec<CuddNode> = Vec::new();
+    let mut state_names: Vec<String> = Vec::new();
+    let mut initial_state: Vec<CuddNode> = Vec::new();
+    let mut fair: Vec<CuddNode> = Vec::new();
+    let mut safe: Vec<CuddNode> = Vec::new();
+
+    for state in automaton.states() {
+        let node = manager.new_var();
+        if state.initial {
+            initial_state.push(node.clone());
+        } else {
+            initial_state.push(node.clone().not());
+        }
+        assert!(!state.rejecting);
+        if let Some(safety_cond) = &state.safety {
+            let safety_cond = translate_guard(
+                &safety_cond,
+                manager,
+                inputs,
+                input_names,
+                &outputs,
+                &output_names,
+            );
+            safe.push(node.implies(&safety_cond));
+        }
+        state_nodes.push(node);
+        state_names.push(state.name.as_ref().unwrap().clone());
+    }
+
+    // build transition function
+    let mut incoming: Vec<CuddNode> = state_nodes.iter().map(|_| manager.zero()).collect();
+    for state in automaton.states() {
+        for (target, guard) in automaton.outgoing(state) {
+            //println!("{} -{}-> {}", state.id, guard, target.id);
+            let translated_guard =
+                translate_guard(guard, manager, inputs, input_names, &outputs, &output_names);
+            incoming[target.id] = incoming[target.id]
+                .clone()
+                .or(&(state_nodes[state.id].clone() & translated_guard));
+        }
+    }
+    LivenessAutomatonEncoding {
+        state_nodes,
+        incoming,
+        state_names,
+        initial_state,
+        fair,
+        safe,
     }
 }
 
@@ -840,7 +1033,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -864,7 +1062,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -889,7 +1092,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -914,7 +1122,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -939,7 +1152,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -966,7 +1184,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 2);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 2, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 2, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
     }
@@ -993,7 +1216,12 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_some());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_some());
     }
@@ -1015,8 +1243,42 @@ mod tests {
         assert!(spec.check().is_ok());
 
         let manager = CuddManager::new();
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_some());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_some());
+    }
+
+    #[test]
+    fn test_unrealizable() {
+        let spec: Specification = serde_json::from_str(
+            r#"
+{
+    "semantics": "mealy",
+    "inputs": ["g"],
+    "outputs": ["r_0", "r_1"],
+    "assumptions": [],
+    "guarantees": [
+        "!((GF r_0) <-> (GF g))"
+    ]
+}
+        "#,
+        )
+        .expect("Specification is not valid");
+        assert!(spec.check().is_ok());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_none());
     }
 }

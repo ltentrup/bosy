@@ -1,5 +1,6 @@
 //! This module contains the logic for the main `bosy` binary.
 
+use crate::bounded::ReductionMethod;
 use crate::safety::{SafetyGame, SafetyGameSolver};
 use bosy::specification::Specification;
 use clap::{App, Arg};
@@ -10,6 +11,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process;
+use std::thread;
 
 pub struct Config {
     filename: String,
@@ -98,15 +100,39 @@ impl Config {
 
         let bound = self.bound;
 
+        let negated_spec = spec.negated();
+
+        //let realizable = thread::spawn(move || {
         let manager = CuddManager::new();
         manager.set_auto_dyn(CuddReordering::GroupSift);
-        let safety_game = SafetyGame::from_bosy(&spec, &manager, bound);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, bound, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, spec.semantics());
         if solver.solve().is_none() {
             println!("result: unknown with bound {}", bound);
         } else {
             println!("result: realizable with bound {}", bound);
+            std::process::exit(10);
         }
+        //});
+        /*let unrealizable = thread::spawn(move || {
+            let manager = CuddManager::new();
+            manager.set_auto_dyn(CuddReordering::GroupSift);
+            let safety_game = SafetyGame::from_bosy(
+                &negated_spec,
+                &manager,
+                bound,
+                ReductionMethod::SingleCounter,
+            );
+            let mut solver = SafetyGameSolver::new(safety_game, negated_spec.semantics());
+            if solver.solve().is_none() {
+                println!("result: unknown with bound {}", bound);
+            } else {
+                println!("result: unrealizable with bound {}", bound);
+                std::process::exit(20);
+            }
+        });*/
+        //realizable.join().unwrap();
+        //unrealizable.join().unwrap();
 
         Ok(())
     }

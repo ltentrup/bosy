@@ -96,7 +96,7 @@ impl Display for Term {
                 for term in terms {
                     write!(f, "{} ", term)?;
                 }
-                write!(f, ")\n\t")
+                write!(f, ")")
             }
             TermKind::Quant(kind, binding, inner) => {
                 let formatted: Vec<String> = binding

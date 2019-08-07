@@ -35,7 +35,7 @@ mod tests {
         let script = format!("{}", instance);
         assert_eq!(
             script,
-            "(declare-fun x (Bool) Bool)\n(assert (forall ((a Bool) (b Bool)) (and (x a )\n\t (x b )\n\t )\n\t))\n"
+            "(declare-fun x (Bool) Bool)\n(assert (forall ((a Bool) (b Bool)) (and (x a ) (x b ) )))\n"
         )
     }
 }

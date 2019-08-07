@@ -33,7 +33,9 @@ impl LTL2Automaton {
         }
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout)?;
-        CoBuchiAutomaton::from(&stdout, spec.get_occurrences().into_iter())
+        let mut automaton = CoBuchiAutomaton::from(&stdout, spec.get_occurrences().into_iter())?;
+        automaton.remove_rejecting_sinks();
+        Ok(automaton)
     }
 }
 
