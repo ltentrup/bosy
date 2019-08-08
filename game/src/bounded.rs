@@ -26,7 +26,7 @@ impl<'a> SafetyGame<'a> {
         let ltl = spec.ltl();
         info!("LTL specification is {}", ltl);
 
-        let partitioned = ltl.normalize().partition().unwrap();
+        let partitioned = ltl.normalize().partition();
 
         if !partitioned.liveness_assumptions.is_empty()
             || !partitioned.reccurrence_assumptions.is_empty()

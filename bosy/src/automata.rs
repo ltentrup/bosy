@@ -101,7 +101,7 @@ impl<L: Logic> CoBuchiAutomaton<L> {
             .states()
             .iter()
             .filter(|s| {
-                if !s.rejecting {
+                if !s.rejecting || s.initial {
                     return false;
                 }
                 let mut outgoing = self.outgoing(s);

@@ -98,7 +98,7 @@ impl HyperLTL {
     pub fn normalize(mut self) -> Self {
         self.check_arity();
         self.remove_derived();
-        self.push_next().to_nnf(false).flatten()
+        self.push_next().to_nnf(false).simplify().flatten()
     }
 
     /// Removes all operators that do not have a dual operation, i.e., `Implication` and `WeakUntil`
@@ -213,7 +213,7 @@ impl HyperLTL {
                 for subf in inner.into_iter() {
                     match subf {
                         Appl(other_op, other_inner) => {
-                            if other_op == op {
+                            if other_op == op && op.is_chainable() {
                                 new_inner.extend(other_inner)
                             } else {
                                 new_inner.push(Appl(other_op, other_inner))
@@ -225,6 +225,45 @@ impl HyperLTL {
                 Appl(op, new_inner)
             }
             Prop(name, path) => Prop(name, path),
+        }
+    }
+
+    // remove true and false
+    fn simplify(self) -> HyperLTL {
+        assert!(self.is_ltl());
+        match self {
+            Appl(op, mut inner) => {
+                inner = inner.into_iter().map(|subf| subf.simplify()).collect();
+                match op {
+                    Op::Conjunction => {
+                        if inner.contains(&HyperLTL::constant_false()) {
+                            return HyperLTL::constant_false();
+                        }
+                        inner.retain(|subf| subf != &HyperLTL::constant_true());
+                        if inner.is_empty() {
+                            return HyperLTL::constant_true();
+                        } else if inner.len() == 1 {
+                            return inner.pop().unwrap();
+                        }
+                        HyperLTL::Appl(Op::Conjunction, inner)
+                    }
+                    Op::Disjunction => {
+                        if inner.contains(&HyperLTL::constant_true()) {
+                            return HyperLTL::constant_true();
+                        }
+                        inner.retain(|subf| subf != &HyperLTL::constant_false());
+                        if inner.is_empty() {
+                            return HyperLTL::constant_false();
+                        } else if inner.len() == 1 {
+                            return inner.pop().unwrap();
+                        }
+                        HyperLTL::Appl(Op::Disjunction, inner)
+                    }
+                    op => HyperLTL::Appl(op, inner),
+                }
+            }
+            Prop(name, path) => Prop(name, path),
+            _ => unreachable!(),
         }
     }
 
@@ -308,8 +347,10 @@ impl HyperLTL {
         }
     }
 
-    pub fn partition(self) -> Result<LTLPartitioning, ()> {
+    pub fn partition(self) -> LTLPartitioning {
         assert!(self.is_ltl());
+
+        println!("partition {}", &self);
 
         let mut assumptions: Vec<HyperLTL> = Vec::new();
         let mut guarantee: Option<HyperLTL> = None;
@@ -350,10 +391,24 @@ impl HyperLTL {
             f => guarantee = Some(f),
         }
 
+        assert!(guarantee.is_some());
         let guarantees = if let Some(Appl(Conjunction, inner)) = guarantee {
             inner
         } else {
-            return Err(());
+            return LTLPartitioning {
+                preset_assumptions: Vec::new(),
+                preset_guarantees: Vec::new(),
+                invariant_assumptions: Vec::new(),
+                invariant_guarantees: Vec::new(),
+                prime_invariant_assumptions: Vec::new(),
+                prime_invariant_guarantees: Vec::new(),
+                safety_assumptions: Vec::new(),
+                safety_guarantees: Vec::new(),
+                reccurrence_assumptions: Vec::new(),
+                reccurrence_guarantees: Vec::new(),
+                liveness_assumptions: Vec::new(),
+                liveness_guarantees: vec![guarantee.unwrap()],
+            };
         };
 
         // negate assumptions
@@ -407,7 +462,7 @@ impl HyperLTL {
                 .into_iter()
                 .partition(|subf| subf.is_reccurrence());
 
-        Ok(LTLPartitioning {
+        LTLPartitioning {
             preset_assumptions,
             preset_guarantees,
             invariant_assumptions,
@@ -420,7 +475,7 @@ impl HyperLTL {
             reccurrence_guarantees,
             liveness_assumptions,
             liveness_guarantees,
-        })
+        }
     }
 }
 

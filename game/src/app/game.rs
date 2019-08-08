@@ -102,7 +102,7 @@ impl Config {
 
         let negated_spec = spec.negated();
 
-        //let realizable = thread::spawn(move || {
+        let realizable = thread::spawn(move || {
         let manager = CuddManager::new();
         manager.set_auto_dyn(CuddReordering::GroupSift);
         let safety_game = SafetyGame::from_bosy(&spec, &manager, bound, ReductionMethod::Unrolling);
@@ -113,8 +113,10 @@ impl Config {
             println!("result: realizable with bound {}", bound);
             std::process::exit(10);
         }
-        //});
-        /*let unrealizable = thread::spawn(move || {
+        
+        
+    });
+        let unrealizable = thread::spawn(move || {
             let manager = CuddManager::new();
             manager.set_auto_dyn(CuddReordering::GroupSift);
             let safety_game = SafetyGame::from_bosy(
@@ -130,9 +132,9 @@ impl Config {
                 println!("result: unrealizable with bound {}", bound);
                 std::process::exit(20);
             }
-        });*/
-        //realizable.join().unwrap();
-        //unrealizable.join().unwrap();
+        });
+        realizable.join().unwrap();
+        unrealizable.join().unwrap();
 
         Ok(())
     }

@@ -126,6 +126,26 @@ impl Op {
     fn is_temporal(&self) -> bool {
         !self.is_propositional()
     }
+
+    fn is_chainable(&self) -> bool {
+        use self::Op::*;
+        match self {
+            Negation => false,
+            Next => false,
+            Finally => false,
+            Globally => false,
+            Conjunction => true,
+            Disjunction => true,
+            Implication => false,
+            Exclusion => false,
+            Equivalence => false,
+            Until => false,
+            Release => false,
+            WeakUntil => false,
+            True => false,
+            False => false,
+        }
+    }
 }
 
 impl HyperLTL {
@@ -136,4 +156,7 @@ impl HyperLTL {
     pub fn new_binary(op: Op, lhs: Self, rhs: Self) -> Self {
         HyperLTL::Appl(op, vec![lhs, rhs])
     }
+
+    fn constant_false() -> HyperLTL { HyperLTL::Appl(Op::False, Vec::new()) }
+    fn constant_true() -> HyperLTL {HyperLTL::Appl(Op::True, Vec::new())}
 }
