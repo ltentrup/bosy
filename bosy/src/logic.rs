@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 pub trait Logic: Hash + Eq + Display + Clone {
-    type Manager;
+    type Manager: Clone;
 
     fn is_false(&self) -> bool;
     fn is_true(&self) -> bool;

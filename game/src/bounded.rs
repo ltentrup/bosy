@@ -359,75 +359,58 @@ impl<'a> SafetyGame<'a> {
                 }
             }
             ReductionMethod::Unrolling => {
-                let conjunctions: Vec<HyperLTL> = if !partitioned.reccurrence_assumptions.is_empty()
-                    || !partitioned.liveness_assumptions.is_empty()
-                {
-                    // build a single LTL formula, as a implication of assumptions and guarantees
-                    let assumptions = partitioned
-                        .reccurrence_assumptions
-                        .iter()
-                        .chain(&partitioned.liveness_assumptions)
-                        .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
-                            HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
-                        })
-                        .normalize();
-                    let guarantees = [HyperLTL::new_unary(
-                        Op::Globally,
-                        HyperLTL::Prop("safe_g".to_string(), None),
-                    )]
+                // build a single LTL formula, as a implication of assumptions and guarantees
+                let assumptions = partitioned
+                    .reccurrence_assumptions
                     .iter()
-                    .chain(&partitioned.reccurrence_guarantees)
-                    .chain(&partitioned.liveness_guarantees)
+                    .chain(&partitioned.liveness_assumptions)
                     .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
                         HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
                     })
                     .normalize();
+                let guarantees = [HyperLTL::new_unary(
+                    Op::Globally,
+                    HyperLTL::Prop("safe_g".to_string(), None),
+                )]
+                .iter()
+                .chain(&partitioned.reccurrence_guarantees)
+                .chain(&partitioned.liveness_guarantees)
+                .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
+                    HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
+                })
+                .normalize();
 
-                    let ltl = HyperLTL::new_binary(Op::Implication, assumptions, guarantees);
-                    vec![ltl]
-                } else {
-                    // can split guarantees
-                    [HyperLTL::new_unary(
-                        Op::Globally,
-                        HyperLTL::Prop("safe_g".to_string(), None),
-                    )]
-                    .iter()
-                    .chain(&partitioned.reccurrence_guarantees)
-                    .chain(&partitioned.liveness_guarantees)
-                    .map(|x| x.clone())
-                    .collect()
-                };
+                let ltl = HyperLTL::new_binary(Op::Implication, assumptions, guarantees);
 
                 let sys_safe_so_far = sys_safe
                     .iter()
                     .fold(manager.one(), |val, safe| val.and(safe));
+                sys_safe.clear();
 
-                for guarantee in &conjunctions {
-                    let LivenessAutomatonEncoding {
-                        state_nodes,
-                        incoming,
-                        state_names,
-                        initial_state,
-                        fair,
-                        safe,
-                    } = build_unrolled_automaton(
-                        guarantee,
-                        &manager,
-                        sys_safe_so_far.clone(),
-                        bound,
-                        &uncontrollables,
-                        &uncontrollable_names,
-                        &controllables,
-                        &controllable_names,
-                    );
-                    assert!(fair.is_empty());
+                let LivenessAutomatonEncoding {
+                    state_nodes,
+                    incoming,
+                    state_names,
+                    initial_state,
+                    fair,
+                    safe,
+                } = build_unrolled_automaton(
+                    &ltl,
+                    &manager,
+                    sys_safe_so_far.clone(),
+                    bound,
+                    &uncontrollables,
+                    &uncontrollable_names,
+                    &controllables,
+                    &controllable_names,
+                );
+                assert!(fair.is_empty());
 
-                    latches.extend(state_nodes);
-                    latch_names.extend(state_names);
-                    compose.extend(incoming);
-                    initial_condition.extend(initial_state);
-                    sys_safe.extend(safe);
-                }
+                latches.extend(state_nodes);
+                latch_names.extend(state_names);
+                compose.extend(incoming);
+                initial_condition.extend(initial_state);
+                sys_safe.extend(safe);
             }
         }
 
@@ -824,6 +807,8 @@ fn build_unrolled_automaton<'a>(
     outputs.push(safe_sys);
     let mut output_names: Vec<String> = Vec::from(output_names);
     output_names.push("safe_g".to_string());
+
+    //println!("{}", &ltl);
 
     let automaton =
         match LTL2Automaton::Spot.to_ucw(&HyperLTL::new_unary(Op::Negation, ltl.clone())) {
@@ -1296,5 +1281,32 @@ mod tests {
         let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
         let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
         assert!(solver.solve().is_none());
+    }
+
+    #[test]
+    fn test_negated_spec() {
+        let spec: Specification = serde_json::from_str(
+            r#"
+{
+  "semantics": "moore",
+  "inputs": ["grant"],
+  "outputs": ["go", "cancel", "req"],
+  "assumptions": [],
+  "guarantees": ["!( (G ((req) -> (X ((grant) || (X ((grant) || (X (grant)))))))) && (G ((grant) -> (X (! (grant))))) && (G ((cancel) -> (X ((! (grant)) U (go))))) )"]
+}
+        "#,
+        )
+        .expect("Specification is not valid");
+        assert!(spec.check().is_ok());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_some());
+
+        let manager = CuddManager::new();
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 1, ReductionMethod::Unrolling);
+        let mut solver = SafetyGameSolver::new(safety_game, Semantics::Mealy);
+        assert!(solver.solve().is_some());
     }
 }

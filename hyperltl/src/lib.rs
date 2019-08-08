@@ -11,7 +11,7 @@ mod print;
 mod serialize;
 mod spot;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum HyperLTL {
     /// A quantifier, e.g. `forall pi`
     Quant(QuantKind, Vec<String>, Box<HyperLTL>),
@@ -21,7 +21,7 @@ pub enum HyperLTL {
     Prop(String, Option<String>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuantKind {
     /// The existential path quantifier
     Exists,
@@ -29,7 +29,7 @@ pub enum QuantKind {
     Forall,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
     /// The Boolean operator `!` for logical inversion
     Negation,

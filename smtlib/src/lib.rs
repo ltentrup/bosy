@@ -14,7 +14,7 @@ mod operator;
 pub mod parse;
 mod print;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instance {
     declarations: Vec<Rc<IdentDecl>>,
     sorts: Vec<Rc<SortDecl>>,

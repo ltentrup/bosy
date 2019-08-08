@@ -15,3 +15,4 @@ serde_derive = "1.0"
 serde_json = "1.0"  # parsing JSON files
 dot = "0.1.4" # graphviz dot visualization
 pathfinding = "1.1.12" # SCC
+libc = "0.2.60" # process killing

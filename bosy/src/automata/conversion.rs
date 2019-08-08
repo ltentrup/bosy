@@ -2,8 +2,11 @@ use super::{CoBuchiAutomaton, StateId};
 use hyperltl::HyperLTL;
 use pest::Parser;
 use smtlib;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::error::Error;
+use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 #[derive(Parser)]
@@ -14,11 +17,23 @@ pub enum LTL2Automaton {
     Spot,
 }
 
+thread_local! {static cache: RefCell<HashMap<HyperLTL, CoBuchiAutomaton<smtlib::Term>>> = RefCell::new(HashMap::new())}
+
 impl LTL2Automaton {
     pub fn to_ucw(&self, spec: &HyperLTL) -> Result<CoBuchiAutomaton<smtlib::Term>, Box<Error>> {
         assert!(spec.is_quantifier_free());
-        //let test = Command::new("pwd").output();
-        //println!("{:?}", test);
+
+        // check if automaton is in cache
+        if let Some(res) = cache.with(|cache_cell| -> Option<CoBuchiAutomaton<smtlib::Term>> {
+            cache_cell.borrow().get(spec).cloned()
+        }) {
+            return Ok(res);
+        }
+
+        // make thr current process the leader of a new process group
+        // thus, the child cwill be terminated on timeout as well
+        unsafe { libc::setsid() };
+
         let output = Command::new("ltl2tgba")
             .env("PATH", "../external/bin:./external/bin")
             .arg("-f")
@@ -35,6 +50,12 @@ impl LTL2Automaton {
         let stdout = String::from_utf8(output.stdout)?;
         let mut automaton = CoBuchiAutomaton::from(&stdout, spec.get_occurrences().into_iter())?;
         automaton.remove_rejecting_sinks();
+
+        // insert into cache
+        cache.with(|cache_cell|  {
+            cache_cell.borrow_mut().insert(spec.clone(), automaton.clone())
+        });
+
         Ok(automaton)
     }
 }

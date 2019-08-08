@@ -16,7 +16,7 @@ use std::thread;
 pub struct Config {
     filename: String,
     verbosity: LevelFilter,
-    bound: u32,
+    bound: Option<u32>,
 }
 
 impl Config {
@@ -43,7 +43,7 @@ impl Config {
                     .help("Sets the bound (number of states in the implementation)")
                     .long("--bound")
                     .takes_value(true)
-                    .required(true),
+                    .required(false),
             )
             .get_matches_from(args);
 
@@ -58,8 +58,7 @@ impl Config {
 
         let bound = matches
             .value_of("BOUND")
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap();
+            .and_then(|s| s.parse::<u32>().ok());
 
         Config {
             filename,
@@ -98,38 +97,52 @@ impl Config {
 
         assert!(spec.hyper().is_none());
 
-        let bound = self.bound;
+        // first start fast but incmplete method
+        let manager = CuddManager::new();
+        manager.set_auto_dyn(CuddReordering::GroupSift);
+        let safety_game = SafetyGame::from_bosy(&spec, &manager, 4, ReductionMethod::SingleCounter);
+        let mut solver = SafetyGameSolver::new(safety_game, spec.semantics());
+        if solver.solve().is_none() {
+            println!("fast method failed");
+        } else {
+            println!("result: realizable");
+            process::exit(10);
+        }
 
         let negated_spec = spec.negated();
 
         let realizable = thread::spawn(move || {
-            let manager = CuddManager::new();
-            manager.set_auto_dyn(CuddReordering::GroupSift);
-            let safety_game =
-                SafetyGame::from_bosy(&spec, &manager, bound, ReductionMethod::Unrolling);
-            let mut solver = SafetyGameSolver::new(safety_game, spec.semantics());
-            if solver.solve().is_none() {
-                println!("result: unknown with bound {}", bound);
-            } else {
-                println!("result: realizable with bound {}", bound);
-                process::exit(10);
+            for &bound in &[2u32, 4, 6, 8, 10, 12, 14, 16, 18, 20] {
+                let manager = CuddManager::new();
+                manager.set_auto_dyn(CuddReordering::GroupSift);
+                let safety_game =
+                    SafetyGame::from_bosy(&spec, &manager, bound, ReductionMethod::Unrolling);
+                let mut solver = SafetyGameSolver::new(safety_game, spec.semantics());
+                if solver.solve().is_none() {
+                    println!("not r-e-a-l with bound {}", bound);
+                } else {
+                    println!("result: realizable with bound {}", bound);
+                    process::exit(10);
+                }
             }
         });
         let unrealizable = thread::spawn(move || {
-            let manager = CuddManager::new();
-            manager.set_auto_dyn(CuddReordering::GroupSift);
-            let safety_game = SafetyGame::from_bosy(
-                &negated_spec,
-                &manager,
-                bound,
-                ReductionMethod::SingleCounter,
-            );
-            let mut solver = SafetyGameSolver::new(safety_game, negated_spec.semantics());
-            if solver.solve().is_none() {
-                println!("result: unknown with bound {}", bound);
-            } else {
-                println!("result: unrealizable with bound {}", bound);
-                process::exit(20);
+            for &bound in &[2u32, 4, 6, 8, 10, 12, 14, 16, 18, 20] {
+                let manager = CuddManager::new();
+                manager.set_auto_dyn(CuddReordering::GroupSift);
+                let safety_game = SafetyGame::from_bosy(
+                    &negated_spec,
+                    &manager,
+                    bound,
+                    ReductionMethod::Unrolling,
+                );
+                let mut solver = SafetyGameSolver::new(safety_game, negated_spec.semantics());
+                if solver.solve().is_none() {
+                    println!("not u-n-r-e-a-l with bound {}", bound);
+                } else {
+                    println!("result: unrealizable with bound {}", bound);
+                    process::exit(20);
+                }
             }
         });
         realizable.join().unwrap();

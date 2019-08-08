@@ -1,5 +1,6 @@
 use bosy::specification::Semantics;
 use cudd::{CuddManager, CuddNode};
+use log::info;
 
 #[derive(Debug)]
 pub struct SafetyGame<'a> {
@@ -69,7 +70,7 @@ impl<'a> SafetyGameSolver<'a> {
         let mut rounds = 0;
         while safe_states != fixpoint {
             rounds += 1;
-            println!("round {}", rounds);
+            info!("round {}", rounds);
 
             fixpoint = safe_states.clone();
             safe_states.and_assign(&self.pre_system(safe_states.clone()));

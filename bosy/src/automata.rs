@@ -35,7 +35,7 @@ impl<L: Logic> std::cmp::PartialEq for State<L> {
 
 type StateId = usize;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoBuchiAutomaton<L: Logic> {
     manager: L::Manager,
     states: Vec<State<L>>,
