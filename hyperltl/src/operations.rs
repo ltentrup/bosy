@@ -174,7 +174,9 @@ impl HyperLTL {
                 if negated {
                     op.negate();
                 }
-                inner = inner.into_iter().map(|subf| subf.to_nnf(negated)).collect();
+                if op != Op::Equivalence && op != Op::Exclusion {
+                    inner = inner.into_iter().map(|subf| subf.to_nnf(negated)).collect();
+                }
                 Appl(op, inner)
             }
             Prop(name, path) => {
@@ -350,10 +352,10 @@ impl HyperLTL {
     pub fn partition(self) -> LTLPartitioning {
         assert!(self.is_ltl());
 
-        println!("partition {}", &self);
-
         let mut assumptions: Vec<HyperLTL> = Vec::new();
         let mut guarantee: Option<HyperLTL> = None;
+
+        //println!("partition {}", &self);
 
         match self {
             Appl(Disjunction, inner) => {
@@ -391,9 +393,27 @@ impl HyperLTL {
             f => guarantee = Some(f),
         }
 
-        assert!(guarantee.is_some());
-        let guarantees = if let Some(Appl(Conjunction, inner)) = guarantee {
-            inner
+        assert!(guarantee.is_some() || !assumptions.is_empty());
+
+        let guarantees = if let Some(guarantee) = guarantee {
+            if let Appl(Conjunction, inner) = guarantee {
+                inner
+            } else {
+                return LTLPartitioning {
+                    preset_assumptions: Vec::new(),
+                    preset_guarantees: Vec::new(),
+                    invariant_assumptions: Vec::new(),
+                    invariant_guarantees: Vec::new(),
+                    prime_invariant_assumptions: Vec::new(),
+                    prime_invariant_guarantees: Vec::new(),
+                    safety_assumptions: Vec::new(),
+                    safety_guarantees: Vec::new(),
+                    reccurrence_assumptions: Vec::new(),
+                    reccurrence_guarantees: Vec::new(),
+                    liveness_assumptions: Vec::new(),
+                    liveness_guarantees: vec![guarantee],
+                };
+            }
         } else {
             return LTLPartitioning {
                 preset_assumptions: Vec::new(),
@@ -407,7 +427,11 @@ impl HyperLTL {
                 reccurrence_assumptions: Vec::new(),
                 reccurrence_guarantees: Vec::new(),
                 liveness_assumptions: Vec::new(),
-                liveness_guarantees: vec![guarantee.unwrap()],
+                liveness_guarantees: vec![assumptions
+                    .into_iter()
+                    .fold(HyperLTL::constant_false(), |val, ass| {
+                        HyperLTL::new_binary(Op::Disjunction, val, ass)
+                    })],
             };
         };
 

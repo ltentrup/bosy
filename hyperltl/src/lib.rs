@@ -157,6 +157,10 @@ impl HyperLTL {
         HyperLTL::Appl(op, vec![lhs, rhs])
     }
 
-    fn constant_false() -> HyperLTL { HyperLTL::Appl(Op::False, Vec::new()) }
-    fn constant_true() -> HyperLTL {HyperLTL::Appl(Op::True, Vec::new())}
+    fn constant_false() -> HyperLTL {
+        HyperLTL::Appl(Op::False, Vec::new())
+    }
+    fn constant_true() -> HyperLTL {
+        HyperLTL::Appl(Op::True, Vec::new())
+    }
 }

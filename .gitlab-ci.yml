@@ -5,6 +5,9 @@ stages:
 image: "rust:latest"
 #image: "rustlang/rust:nightly"
 
+variables:
+  GIT_SUBMODULE_STRATEGY: normal
+
 # Install additional packages, like a C compiler and cmake
 before_script:
 - apt-get update -yqq
