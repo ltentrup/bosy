@@ -359,59 +359,75 @@ impl<'a> SafetyGame<'a> {
                 }
             }
             ReductionMethod::Unrolling => {
-                // build a single LTL formula
-                let assumptions = partitioned
-                    .reccurrence_assumptions
+                let conjunctions: Vec<HyperLTL> = if !partitioned.reccurrence_assumptions.is_empty()
+                    || !partitioned.liveness_assumptions.is_empty()
+                {
+                    // build a single LTL formula, as a implication of assumptions and guarantees
+                    let assumptions = partitioned
+                        .reccurrence_assumptions
+                        .iter()
+                        .chain(&partitioned.liveness_assumptions)
+                        .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
+                            HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
+                        })
+                        .normalize();
+                    let guarantees = [HyperLTL::new_unary(
+                        Op::Globally,
+                        HyperLTL::Prop("safe_g".to_string(), None),
+                    )]
                     .iter()
-                    .chain(&partitioned.liveness_assumptions)
+                    .chain(&partitioned.reccurrence_guarantees)
+                    .chain(&partitioned.liveness_guarantees)
                     .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
                         HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
                     })
                     .normalize();
-                let guarantees = [HyperLTL::new_unary(
-                    Op::Globally,
-                    HyperLTL::Prop("safe_g".to_string(), None),
-                )]
-                .iter()
-                .chain(&partitioned.reccurrence_guarantees)
-                .chain(&partitioned.liveness_guarantees)
-                .fold(HyperLTL::Appl(Op::True, vec![]), |val, assumption| {
-                    HyperLTL::new_binary(Op::Conjunction, val, assumption.clone())
-                })
-                .normalize();
 
-                // TODO: partition if no assumptions
+                    let ltl = HyperLTL::new_binary(Op::Implication, assumptions, guarantees);
+                    vec![ltl]
+                } else {
+                    // can split guarantees
+                    [HyperLTL::new_unary(
+                        Op::Globally,
+                        HyperLTL::Prop("safe_g".to_string(), None),
+                    )]
+                    .iter()
+                    .chain(&partitioned.reccurrence_guarantees)
+                    .chain(&partitioned.liveness_guarantees)
+                    .map(|x| x.clone())
+                    .collect()
+                };
 
-                let ltl = HyperLTL::new_binary(Op::Implication, assumptions, guarantees);
                 let sys_safe_so_far = sys_safe
                     .iter()
                     .fold(manager.one(), |val, safe| val.and(safe));
-                println!("{}", ltl);
 
-                let LivenessAutomatonEncoding {
-                    state_nodes,
-                    incoming,
-                    state_names,
-                    initial_state,
-                    fair,
-                    safe,
-                } = build_unrolled_automaton(
-                    &ltl,
-                    &manager,
-                    sys_safe_so_far,
-                    bound,
-                    &uncontrollables,
-                    &uncontrollable_names,
-                    &controllables,
-                    &controllable_names,
-                );
-                assert!(fair.is_empty());
+                for guarantee in &conjunctions {
+                    let LivenessAutomatonEncoding {
+                        state_nodes,
+                        incoming,
+                        state_names,
+                        initial_state,
+                        fair,
+                        safe,
+                    } = build_unrolled_automaton(
+                        guarantee,
+                        &manager,
+                        sys_safe_so_far.clone(),
+                        bound,
+                        &uncontrollables,
+                        &uncontrollable_names,
+                        &controllables,
+                        &controllable_names,
+                    );
+                    assert!(fair.is_empty());
 
-                latches.extend(state_nodes);
-                latch_names.extend(state_names);
-                compose.extend(incoming);
-                initial_condition.extend(initial_state);
-                sys_safe.extend(safe);
+                    latches.extend(state_nodes);
+                    latch_names.extend(state_names);
+                    compose.extend(incoming);
+                    initial_condition.extend(initial_state);
+                    sys_safe.extend(safe);
+                }
             }
         }
 
