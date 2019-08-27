@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 fn main() {
     // Build the project in the path `cudd` and installs it in `$OUT_DIR`
-    let dst = autotools::build("cudd");
+    let dst = autotools::Config::new("cudd").cflag("-fPIC").build();
 
     // Simply link the library without using pkg-config
     println!("cargo:rustc-link-search=native={}/lib", dst.display());
