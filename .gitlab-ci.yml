@@ -11,7 +11,7 @@ variables:
 # Install additional packages, like a C compiler and cmake
 before_script:
 - apt-get update -yqq
-- apt-get install -yqq --no-install-recommends automake autoconf build-essential cmake llvm-3.9-dev libclang-3.9-dev clang-3.9
+- apt-get install -yqq --no-install-recommends automake autoconf build-essential cmake llvm-6.0-dev libclang-6.0-dev clang-6.0
 # some cmake stuff requires setting git config
 - git config --global user.email "you@example.com"
 - git config --global user.name "Your Name"
