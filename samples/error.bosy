@@ -1,0 +1,1 @@
+{"semantics": "mealy","inputs": ["r_0", "r_1", "g_0"],"outputs": ["g_0", "g_1"],"assumptions": ["F a"],"guarantees": ["G (!g_0 || ! g_1)","G (r_0 -> F g_0)","G (r_1 -> F g_1)","forall pi : G r_0[pi]"],"hyper": ["GF g_0"]}

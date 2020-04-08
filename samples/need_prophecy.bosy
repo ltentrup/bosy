@@ -1,0 +1,11 @@
+{
+    "semantics": "mealy",
+    "inputs": ["i"],
+    "outputs": ["o", "x"],
+    "assumptions": [],
+    "guarantees": ["x"],
+    "hyper": [
+        "forall pi1. exists pi2. o[pi2] <-> F i[pi1]"
+    ]
+}
+

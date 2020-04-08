@@ -1,0 +1,27 @@
+{
+    "semantics": "mealy",
+    "inputs": ["paid_a", "paid_b", "paid_c", "paid_n", "secret_ab", "secret_bc", "secret_ac"],
+    "outputs": ["paid_group", "out_a", "out_b", "out_c"],
+    "assumptions": [
+        "G (!paid_a || !paid_b)",
+        "G (!paid_a || !paid_c)",
+        "G (!paid_a || !paid_n)",
+        "G (!paid_b || !paid_c)",
+        "G (!paid_b || !paid_n)",
+        "G (!paid_c || !paid_n)",
+        "G (paid_a || paid_b || paid_c || paid_n)"
+    ],
+    "guarantees": [
+        "G ( paid_group <-> !(paid_n) )"
+    ],
+    "hyper": [
+        "forall pi1 pi2. ( (out_a[pi1] <-> out_a[pi2]) W !((paid_a[pi1] <-> paid_a[pi2]) && (secret_ab[pi1] <-> secret_ab[pi2]) && (secret_ac[pi1] <-> secret_ac[pi2])) )",
+        "forall pi1 pi2. ( (out_b[pi1] <-> out_b[pi2]) W !((paid_b[pi1] <-> paid_b[pi2]) && (secret_ab[pi1] <-> secret_ab[pi2]) && (secret_bc[pi1] <-> secret_bc[pi2])) )",
+        "forall pi1 pi2. ( (out_c[pi1] <-> out_c[pi2]) W !((paid_c[pi1] <-> paid_c[pi2]) && (secret_ac[pi1] <-> secret_ac[pi2]) && (secret_bc[pi1] <-> secret_bc[pi2])) )",
+        "forall pi1 pi2. ( (paid_group[pi1] <-> paid_group[pi2]) W !((out_a[pi1] <-> out_a[pi2]) && (out_b[pi1] <-> out_b[pi2]) && (out_c[pi1] <-> out_c[pi2])) )",
+        "forall pi1 pi2. G ( (paid_a[pi1] && !paid_a[pi2] && !paid_b[pi1] && paid_b[pi2] && (secret_ab[pi1] <-> !secret_ab[pi2]) && (secret_bc[pi1] <-> secret_bc[pi2])  && (secret_ac[pi1] <-> secret_ac[pi2])  ) -> ((out_a[pi1] <-> out_a[pi2]) && (out_b[pi1] <-> out_b[pi2]) ) )",
+        "forall pi1 pi2. G ( (paid_a[pi1] && !paid_a[pi2] && !paid_c[pi1] && paid_c[pi2] && (secret_ab[pi1] <-> secret_ab[pi2])  && (secret_bc[pi1] <-> secret_bc[pi2])  && (secret_ac[pi1] <-> !secret_ac[pi2]) ) -> ((out_a[pi1] <-> out_a[pi2]) && (out_c[pi1] <-> out_c[pi2]) ) )",
+        "forall pi1 pi2. G ( (paid_b[pi1] && !paid_b[pi2] && !paid_c[pi1] && paid_c[pi2] && (secret_ab[pi1] <-> secret_ab[pi2])  && (secret_bc[pi1] <-> !secret_bc[pi2]) && (secret_ac[pi1] <-> secret_ac[pi2])  ) -> ((out_b[pi1] <-> out_b[pi2]) && (out_c[pi1] <-> out_c[pi2]) ) )"
+    ]
+}
+

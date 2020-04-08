@@ -1,0 +1,17 @@
+{
+    "semantics": "mealy",
+    "inputs": ["decide", "locked", "hready", "burst4"],
+    "outputs": ["ready2"],
+    "assumptions": [
+        "(! (decide))",
+        "(G (F (hready)))",
+        "(G ((! (ready2)) -> (X (! (decide)))))"
+    ],
+    "guarantees": [
+        "(G ((decide) -> (X (X ((((burst4) && (locked)) -> ((! (ready2)) U (((hready) && (! (ready2))) && (X ((! (ready2)) U (((hready) && (! (ready2))) && (X ((! (ready2)) U (((hready) && (! (ready2))) && (X ((! (ready2)) U (((hready) && (! (ready2))) && (X (ready2)))))))))))))) && (((! (burst4)) || (! (locked))) -> (ready2)))))))",
+         "(G (((ready2) && (X (! (decide)))) -> (X (ready2))))",
+         "(G (((ready2) && (X (decide))) -> (X ((! (ready2)) && (X (! (ready2)))))))",
+         "(ready2)"
+    ]
+}
+

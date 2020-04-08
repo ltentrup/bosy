@@ -1,0 +1,17 @@
+{
+    "semantics": "mealy",
+    "inputs": ["r1", "r2", "tie"],
+    "outputs": ["g1", "g2"],
+    "assumptions": [],
+    "guarantees": [
+        "(G (r1 -> F g1))",
+        "(G (r2 -> F g2))",
+        "(G (!g1 || !g2))",
+        "( !g1 W r1 )",
+        "( !g2 W r2 )"
+    ],
+    "hyper": [
+        "forall pi1 pi2. ( (g1[pi1] <-> g2[pi2]) W !((tie[pi1] <-> !tie[pi2]) && (r1[pi1] <-> r2[pi2])) )"
+    ]
+}
+

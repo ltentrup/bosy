@@ -1,0 +1,7 @@
+{
+  "semantics": "moore",
+  "inputs": ["grant"],
+  "outputs": ["go", "cancel", "req"],
+  "assumptions": [],
+  "guarantees": ["!( (G ((req) -> (X ((grant) || (X ((grant) || (X (grant)))))))) && (G ((grant) -> (X (! (grant))))) && (G ((cancel) -> (X ((! (grant)) U (go))))) )"] }
+

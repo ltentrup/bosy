@@ -1,0 +1,10 @@
+{
+ "semantics": "mealy",
+ "inputs": ["request"],
+ "outputs": ["grant"],
+ "assumptions": [],
+ "guarantees": ["grant || !grant"],
+ "hyper": [
+   "exists piq. forall pi. G ( request[pi] -> F request[piq] && ! request[piq] U grant[pi])"
+ ]
+}

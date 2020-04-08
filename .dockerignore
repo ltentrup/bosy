@@ -1,0 +1,5 @@
+.git
+target
+external
+.dockerignore
+samples

@@ -1,0 +1,16 @@
+{
+    "semantics": "mealy",
+    "inputs": ["request1", "request2"],
+    "outputs": ["grant1", "grant2"],
+    "assumptions": [],
+    "guarantees": [
+        "G (request1 -> F grant1)",
+        "G (request2 -> F grant2)",
+        "G !(grant1 && grant2)",
+        "( !grant1 W request1 )",
+        "( !grant2 W request2 )"
+    ],
+    "hyper": [
+        "forall pi1. exists pi. forall pi2. (G (request1[pi1] -> X (!request1[pi1] W grant1[pi1]))) ->  G (request1[pi1] && request1[pi2] -> X F request1[pi] && (!request1[pi] U grant1[pi1] && (!request1[pi] U grant1[pi2])))"
+    ]
+}

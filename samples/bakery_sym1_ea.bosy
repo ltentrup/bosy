@@ -1,0 +1,11 @@
+{
+    "semantics": "mealy",
+    "inputs": ["select_0", "select_1", "pause"],
+    "outputs": ["dummy", "bakery_pc_0_0__out", "bakery_pc_1_0__out", "bakery_pc_0_1__out", "bakery_pc_1_1__out", "bakery_pc_0_2__out", "bakery_pc_1_2__out", "bakery_pc_0_3__out", "bakery_pc_1_3__out"],
+    "assumptions": [],
+    "guarantees": ["dummy"],
+    "hyper": [
+        "exists pi0. forall pi1. (~ (G ((bakery_pc_0_0__out[pi0] <-> bakery_pc_1_0__out[pi1]) & (bakery_pc_0_0__out[pi1] <-> bakery_pc_1_0__out[pi0]) & (bakery_pc_0_1__out[pi0] <-> bakery_pc_1_1__out[pi1]) & (bakery_pc_0_1__out[pi1] <-> bakery_pc_1_1__out[pi0]) & (bakery_pc_0_2__out[pi0] <-> bakery_pc_1_2__out[pi1]) & (bakery_pc_0_2__out[pi1] <-> bakery_pc_1_2__out[pi0]) & (bakery_pc_0_3__out[pi0] <-> bakery_pc_1_3__out[pi1]) & (bakery_pc_0_3__out[pi1] <-> bakery_pc_1_3__out[pi0]))))"
+    ]
+}
+
