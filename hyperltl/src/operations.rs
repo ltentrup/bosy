@@ -501,6 +501,40 @@ impl HyperLTL {
             liveness_guarantees,
         }
     }
+
+    pub fn contains_propositional_quantifier(&self) -> Vec<String> {
+        assert!(self.is_hyperltl());
+        let body = self.get_body();
+        let props = self.get_propositions();
+        let mut ret = Vec::new();
+        for (kind, quantifiers) in self.get_quantifier() {
+            for q in quantifiers {
+                if props.contains(q.as_str()) {
+                    ret.push(q);
+                }
+            }
+        }
+
+        ret
+    }
+
+    pub fn replace_propositional_quantifier(&mut self, quants: &[String]) {
+        match self {
+            Quant(_, _, inner) => inner.replace_propositional_quantifier(quants),
+            Appl(_, ops) => ops
+                .iter_mut()
+                .for_each(|f| f.replace_propositional_quantifier(quants)),
+            Prop(name, path) => {
+                if path.is_some() {
+                    return;
+                }
+                if quants.contains(name) {
+                    *path = Some(name.to_string());
+                    *name = "dummy".to_string();
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Default)]

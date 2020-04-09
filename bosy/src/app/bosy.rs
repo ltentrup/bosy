@@ -85,9 +85,11 @@ impl Config {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
 
-        let spec: Specification = serde_json::from_str(&contents)?;
+        let mut spec: Specification = serde_json::from_str(&contents)?;
 
         //println!("Specification {:#?}", spec);
+
+        spec.transform_propositional_quantifier();
 
         match spec.check() {
             Err(errors) => {

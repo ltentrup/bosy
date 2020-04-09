@@ -1,6 +1,6 @@
 {
     "semantics": "mealy",
-    "inputs": ["request1", "request2", "color"],
+    "inputs": ["request1", "request2"],
     "outputs": ["grant1", "grant2"],
     "assumptions": [],
     "guarantees": [
@@ -9,6 +9,6 @@
         "G !(grant1 && grant2)"
     ],
     "hyper": [
-        "exists pi. forall pip. GF color[pi] && GF !color[pi] && G (request1[pip] -> ( color[pi] U ( !color[pi] U grant1[pi] ) ) && ( !color[pi] U ( color[pi] U grant1[pip] ) ) )"
+        "exists color. forall pi. GF color && GF !color && G (request1[pi] -> ( color U ( !color U grant1[pi] ) ) && ( !color U ( color U grant1[pi] ) ) )"
     ]
 }

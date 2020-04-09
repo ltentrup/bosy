@@ -158,6 +158,21 @@ impl Specification {
             hyper: None,
         }
     }
+
+    pub fn transform_propositional_quantifier(&mut self) {
+        let hyper = if let Some(hyper) = self.hyper.as_mut() {
+            hyper
+        } else {
+            return;
+        };
+
+        self.inputs.push("dummy".to_string());
+
+        for formula in hyper {
+            let quants = formula.contains_propositional_quantifier();
+            formula.replace_propositional_quantifier(&quants);
+        }
+    }
 }
 
 impl Semantics {
@@ -181,5 +196,4 @@ mod tests {
         assert!(spec.check().is_err());
         Ok(())
     }
-
 }
